@@ -3,6 +3,7 @@ import time
 from scenarios.producer_consumer import ProducerConsumerScenario
 from scenarios.dining_philosophers import DiningPhilosophersScenario
 from scenarios.readers_writers import ReadersWritersScenario
+from scenarios.bankers_algorithm import BankersAlgorithmScenario
 
 
 class TestScenarios(unittest.TestCase):
@@ -75,6 +76,24 @@ class TestScenarios(unittest.TestCase):
 
         # Anomalies (dirty read, torn read, or concurrent writers) caught
         self.assertGreater(scenario.anomaly_count, 0)
+
+    def test_bankers_safety_check(self):
+        scenario = BankersAlgorithmScenario(sync_mode=True, thread_count=5)
+        self.assertTrue(scenario.is_currently_safe)
+        self.assertEqual(len(scenario.safe_sequence), 5)
+        # In standard textbook state, P1 or P3 can execute first
+        self.assertIn(scenario.safe_sequence[0], [1, 3])
+
+    def test_bankers_request_evaluation_sync_on(self):
+        scenario = BankersAlgorithmScenario(sync_mode=True, thread_count=5)
+        # P1 requests [1, 0, 2] which is safe
+        res = scenario.request_resources(1, [1, 0, 2])
+        self.assertEqual(res["status"], "GRANTED_SAFE")
+        self.assertTrue(scenario.is_currently_safe)
+
+        # Process requests beyond Need -> should be rejected with MAX_CLAIM_VIOLATION
+        res_exceeded = scenario.request_resources(0, [9, 9, 9])
+        self.assertEqual(res_exceeded["status"], "ERROR_EXCEEDED_MAX")
 
 
 if __name__ == "__main__":

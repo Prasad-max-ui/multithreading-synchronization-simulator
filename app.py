@@ -5,6 +5,7 @@ from flask_socketio import SocketIO, emit
 from scenarios.producer_consumer import ProducerConsumerScenario
 from scenarios.dining_philosophers import DiningPhilosophersScenario
 from scenarios.readers_writers import ReadersWritersScenario
+from scenarios.bankers_algorithm import BankersAlgorithmScenario
 from scenarios.base_scenario import BaseScenario
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
@@ -113,6 +114,13 @@ def handle_start(data):
                 speed=speed,
                 emitter=broadcast_event
             )
+        elif scenario_type == "bankers_algorithm":
+            current_simulation = BankersAlgorithmScenario(
+                sync_mode=sync_mode,
+                thread_count=thread_count,
+                speed=speed,
+                emitter=broadcast_event
+            )
         else:
             emit("simulation_error", {"message": f"Unknown scenario: {scenario_type}"})
             return
@@ -166,6 +174,18 @@ def handle_speed(data):
         if current_simulation:
             current_simulation.set_speed(speed)
             print(f"[Server] Speed updated to {speed}")
+
+
+@socketio.on("banker_custom_request")
+def handle_banker_request(data):
+    process_id = int(data.get("process_id", 0))
+    request_vector = [int(x) for x in data.get("request", [0, 0, 0])]
+    with sim_lock:
+        if current_simulation and isinstance(current_simulation, BankersAlgorithmScenario):
+            result = current_simulation.request_resources(process_id, request_vector)
+            emit("banker_request_result", result)
+        else:
+            emit("simulation_error", {"message": "Banker's Algorithm scenario is not currently active"})
 
 
 if __name__ == "__main__":

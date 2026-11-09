@@ -15,10 +15,11 @@ An educational web application built with **Python (Flask + Flask-SocketIO + nat
    - **Step**: Advances execution by releasing one thread event at a time.
    - **Reset**: Cleanly terminates all worker threads using cooperative `threading.Event` flags (no force-killing or hanging).
    - **Speed Multiplier**: Dynamically adjusts delays from 0.3x to 3.0x.
-4. **Three Classic Concurrency Scenarios**:
+4. **Four Classic Concurrency Scenarios**:
    - **Producer-Consumer (Bounded Buffer)**
    - **Dining Philosophers (Deadlock Simulation)**
    - **Readers-Writers (Shared Ledger Record)**
+   - **Banker's Algorithm (Deadlock Avoidance Laboratory)**
 5. **Sync Mode Toggle (ON / OFF)**:
    - **Sync ON**: Primitives guarantee mathematical correctness and mutual exclusion.
    - **Sync OFF**: Unsynchronized memory access reliably produces visible race conditions, dirty reads, buffer corruption, and circular wait deadlocks.
@@ -42,7 +43,8 @@ midsem/
 │   ├── base_scenario.py       # Thread lifecycle, pause/step hooks, exception isolation
 │   ├── producer_consumer.py   # Bounded buffer simulation (Sync ON vs OFF)
 │   ├── dining_philosophers.py # 5 philosophers, forks, circular wait deadlock
-│   └── readers_writers.py     # Shared record mutex, dirty/torn read detection
+│   ├── readers_writers.py     # Shared record mutex, dirty/torn read detection
+│   └── bankers_algorithm.py   # Banker's Deadlock Avoidance, Safety Algorithm, Matrices
 ├── static/
 │   ├── css/
 │   │   └── style.css          # Dark-mode glassmorphic design system and animations
@@ -53,7 +55,8 @@ midsem/
 ├── tests/
 │   ├── __init__.py
 │   ├── test_sync_wrappers.py  # Unit tests for locks, semaphores, and conditions
-│   └── test_scenarios.py      # Unit tests for all three concurrency scenarios
+│   └── test_scenarios.py      # Unit tests for all four concurrency scenarios
+├── PRESENTATION_SLIDES.md     # 8-Slide master presentation deck with 5-member pitch scripts
 └── README.md
 ```
 
@@ -146,11 +149,29 @@ python -m unittest discover tests -v
 
 ---
 
+### 4. Banker's Algorithm (Deadlock Avoidance Laboratory)
+- **Concept**: Dijkstra's Banker's Algorithm for multi-resource deadlock avoidance. Evaluates whether granting resource requests preserves a **Safe State** ($\langle P_1, P_3, P_4, P_0, P_2 \rangle$) or risks entering an **Unsafe State** (potential deadlock).
+- **Interactive OS Matrices Displayed**:
+  - **Allocation Matrix**: Current resources allocated to each process $[P_i \times R_j]$.
+  - **Max Claim Matrix**: Declared maximum resource requirements.
+  - **Need Matrix**: Remaining resources needed before task completion ($\text{Need} = \text{Max} - \text{Allocation}$).
+  - **Available Vector**: Physical system resources currently free for allocation.
+- **Sync Mode ON (Banker's Avoidance Enabled)**:
+  - Every resource request is vetted through Dijkstra's **Safety Algorithm** ($Work = Work + Allocation_i$).
+  - If granting a request preserves a safe execution sequence, it is approved; if unsafe, it is rejected or delayed.
+  - Zero deadlocks occur.
+- **Sync Mode OFF (Naive Allocation Bypassing Avoidance)**:
+  - Grants requests blindly whenever $Request \le Available$ without running the safety test.
+  - Rapidly leads system into an **Unsafe State** where resources are depleted, no process can complete, and system enters permanent deadlock.
+- **Interactive Request Evaluator**: Users can select any process ($P_0 - P_4$) and enter custom requests $[R_A, R_B, R_C]$ to see step-by-step trace evaluation in real time.
+
+---
+
 ## 🛠️ Concurrency Controls Guide
 
 | Control | Action | Details |
 | :--- | :--- | :--- |
-| **Scenario Dropdown** | Select Scenario | Switch between Producer-Consumer, Dining Philosophers, and Readers-Writers. |
+| **Scenario Dropdown** | Select Scenario | Switch between Producer-Consumer, Dining Philosophers, Readers-Writers, and Banker's Algorithm. |
 | **Sync Mode Switch** | Toggle ON / OFF | Switch between safe synchronization and unsynchronized race condition mode. |
 | **Thread Count** | Adjust Threads | Set worker thread count (2 to 10). |
 | **Speed Slider** | Adjust Delays | Scale delay intervals from 0.3x (slow-motion analysis) to 3.0x (high-throughput). |
@@ -163,7 +184,7 @@ python -m unittest discover tests -v
 
 ## 🧪 Unit Test Coverage
 
-The test suite in `/tests` verifies:
+The test suite in `/tests` verifies 13 automated unit tests (`python -m unittest discover tests -v`):
 - `test_instrumented_lock_basic`: Verifies mutual exclusion and event callbacks (`LOCK_ATTEMPT`, `LOCK_ACQUIRED`, `LOCK_RELEASED`).
 - `test_instrumented_lock_context_manager`: Tests Python `with lock:` semantics.
 - `test_instrumented_lock_interruptible`: Verifies `acquire_interruptible()` wakes up promptly on `stop_event`.
@@ -175,3 +196,45 @@ The test suite in `/tests` verifies:
 - `test_dining_philosophers_sync_off_deadlock`: Confirms circular wait deadlock is triggered and clean reset recovers immediately.
 - `test_readers_writers_sync_on`: Confirms mutual exclusion for writers and consistent checksums.
 - `test_readers_writers_sync_off`: Confirms dirty/torn read anomalies are flagged.
+- `test_bankers_safety_check`: Verifies Dijkstra's Safety Algorithm calculates safe state and execution sequence $\langle P_1, P_3, P_4, P_0, P_2 \rangle$.
+- `test_bankers_request_evaluation_sync_on`: Tests Banker's resource-request algorithm approving safe requests and denying max claim violations.
+
+---
+
+## 👥 Team Contribution & Module Division (5 Members)
+
+| Member | Role / Designation | Primary Files Owned | Key OS Concepts Handled |
+| :--- | :--- | :--- | :--- |
+| **Member 1** | **Synchronization & Instrumentation Lead** | `sync/instrumented.py`<br>`sync/__init__.py` | Mutex Locks, Condition Variables, Counting Semaphores, Interruptible Locks, Event Telemetry |
+| **Member 2** | **Thread Lifecycle & Producer-Consumer Lead** | `scenarios/base_scenario.py`<br>`scenarios/producer_consumer.py` | Thread Lifecycle, Cooperative Shutdown (`threading.Event`), Single-Stepping Semaphore, Bounded Buffer Invariants |
+| **Member 3** | **Deadlock Detection & Dining Philosophers Lead** | `scenarios/dining_philosophers.py` | Coffman’s 4 Conditions, Circular Wait Deadlock, Background Deadlock Detector, Dijkstra’s Resource Hierarchy |
+| **Member 4** | **Readers-Writers & Data Integrity Specialist** | `scenarios/readers_writers.py` | Reader-Preference Protocol, Shared vs Exclusive Mutex, Race Conditions, Dirty Reads, Torn Reads |
+| **Member 5** | **Deadlock Avoidance & Banker’s Algorithm Lead** | `scenarios/bankers_algorithm.py`<br>`app.py` & `tests/` | Banker's Algorithm, Safety Algorithm, Allocation/Max/Need Matrices, WebSocket Gateway, Unit Testing |
+
+### Detailed Member Responsibilities & Pitch Guide
+
+#### 👤 Member 1: Team Lead & Synchronization Architecture
+* **Files:** `sync/instrumented.py`, `sync/__init__.py`
+* **Contributions:** Engineered non-invasive instrumentation wrappers around native `threading.Lock`, `threading.Semaphore`, and `threading.Condition`. Implemented `acquire_interruptible()` with timeout polling so blocked threads release and join cleanly on reset.
+* **Pitch Line:** *"I built the synchronization and instrumentation layer. Instead of fake frontend animations, every worker thread is an actual OS kernel thread. My wrappers capture micro-telemetry on every acquire, release, and condition signal without altering the core synchronization algorithms."*
+
+#### 👤 Member 2: Thread Lifecycle & Producer-Consumer Lead
+* **Files:** `scenarios/base_scenario.py`, `scenarios/producer_consumer.py`
+* **Contributions:** Built the `BaseScenario` engine with cooperative cancellation via `threading.Event` (`stop_event`) and interactive single-stepping using an internal `Semaphore(0)`. Implemented the Producer-Consumer bounded buffer problem demonstrating Condition variable synchronization (SYNC ON) vs. buffer overflow/underflow race conditions (SYNC OFF).
+* **Pitch Line:** *"I developed the thread lifecycle controller and the Producer-Consumer scenario. I implemented cooperative cancellation so threads exit cleanly on reset, plus a stepping semaphore for granular debugging. In Producer-Consumer, I proved that without condition variables, concurrent buffer checks produce real overflows and underflows in shared memory."*
+
+#### 👤 Member 3: Deadlock Detection & Dining Philosophers Lead
+* **Files:** `scenarios/dining_philosophers.py`
+* **Contributions:** Implemented the Dining Philosophers scenario demonstrating the 4 Coffman conditions (Mutual Exclusion, Hold & Wait, No Preemption, Circular Wait). Built the background deadlock monitor thread and implemented Dijkstra's Resource Hierarchy solution ($\min$ then $\max$ fork index) to break the circular wait cycle.
+* **Pitch Line:** *"I focused on deadlock theory. In SYNC OFF mode, all philosophers pick up their left fork simultaneously, fulfilling all four Coffman conditions and creating a circular wait deadlock. In SYNC ON mode, I implemented Dijkstra's resource hierarchy to order fork acquisition by index, mathematically eliminating circular wait."*
+
+#### 👤 Member 4: Readers-Writers & Data Integrity Specialist
+* **Files:** `scenarios/readers_writers.py`
+* **Contributions:** Designed the shared database ledger scenario implementing reader-preference mutual exclusion. Built detection checks for dirty reads (reading during write), torn reads ($\text{version} \ne \text{checksum}$), and concurrent writer collisions.
+* **Pitch Line:** *"I was responsible for the Readers-Writers problem and data integrity. In SYNC ON mode, I implemented reader-preference mutual exclusion allowing multiple readers while guaranteeing writers exclusive access. In SYNC OFF mode, my verification checks capture real dirty reads and torn multi-field updates."*
+
+#### 👤 Member 5: Deadlock Avoidance (Banker's Algorithm) & QA Lead
+* **Files:** `scenarios/bankers_algorithm.py`, `app.py`, `tests/`
+* **Contributions:** Implemented Dijkstra's Banker's Algorithm for deadlock avoidance with live Allocation, Max, Need matrices, and Available vector. Built the Safety Algorithm evaluator finding valid execution sequences $\langle P_1 \to P_3 \to P_4 \to P_0 \to P_2 \rangle$ and created the interactive custom resource-request tester. Authored the 13 automated unit tests.
+* **Pitch Line:** *"I implemented Dijkstra's Banker's Algorithm to demonstrate active deadlock avoidance. My module evaluates multi-resource matrices and runs the Safety Algorithm to determine whether granting a request leaves the system in a Safe State or Unsafe State. I also built the interactive tester and automated test suite."*
+

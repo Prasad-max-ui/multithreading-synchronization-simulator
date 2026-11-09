@@ -93,6 +93,7 @@
                         <option value="producer_consumer" selected>Producer-Consumer (Bounded Buffer)</option>
                         <option value="dining_philosophers">Dining Philosophers (Deadlock Simulation)</option>
                         <option value="readers_writers">Readers-Writers (Shared Record Mutex)</option>
+                        <option value="bankers_algorithm">Banker's Algorithm (Deadlock Avoidance Lab)</option>
                     </select>
                 </div>
             </div>
@@ -247,6 +248,112 @@
                     </div>
                     <div class="scenario-memo">
                         <p><strong>Readers-Writers Rule:</strong> Multiple readers may read simultaneously, but writers require exclusive access. With <strong>SYNC ON</strong>, mutual exclusion is preserved. With <strong>SYNC OFF</strong>, readers experience dirty reads and torn states!</p>
+                    </div>
+                </div>
+
+                <!-- VIEWPORT: BANKER'S ALGORITHM -->
+                <div id="viewBankersAlgorithm" class="scenario-viewport">
+                    <!-- Top Status Bar: Safe Sequence & Safety State -->
+                    <div class="banker-safety-banner" id="bankerSafetyBanner">
+                        <div class="safety-state-badge badge-safe" id="bankerSafetyStateBadge">
+                            <span class="pulse-dot"></span>
+                            <span id="bankerStateText">SAFE STATE</span>
+                        </div>
+                        <div class="safe-sequence-display">
+                            <span class="safe-seq-label">SAFE EXECUTION SEQUENCE:</span>
+                            <span id="bankerSafeSeqText" class="safe-seq-nodes">&lt; P1 → P3 → P4 → P0 → P2 &gt;</span>
+                        </div>
+                    </div>
+
+                    <!-- Available Vector Bar -->
+                    <div class="banker-available-bar">
+                        <span class="banker-bar-title">AVAILABLE SYSTEM RESOURCES (Available Vector)</span>
+                        <div class="available-chips-row" id="bankerAvailableChips">
+                            <div class="avail-chip"><span class="chip-label">R_A (CPU):</span> <strong id="availValA">3</strong> / 10</div>
+                            <div class="avail-chip"><span class="chip-label">R_B (RAM):</span> <strong id="availValB">3</strong> / 5</div>
+                            <div class="avail-chip"><span class="chip-label">R_C (DISK):</span> <strong id="availValC">2</strong> / 7</div>
+                        </div>
+                    </div>
+
+                    <!-- The 3 Matrices Side-by-Side: Allocation, Max, Need -->
+                    <div class="banker-matrices-grid">
+                        <!-- Allocation Matrix Table -->
+                        <div class="matrix-card">
+                            <div class="matrix-card-header">
+                                <span class="matrix-title">Allocation Matrix</span>
+                                <span class="matrix-formula">Current Allocated [Alloc]</span>
+                            </div>
+                            <table class="os-matrix-table" id="tableAllocation">
+                                <thead><tr><th>Proc</th><th>R_A</th><th>R_B</th><th>R_C</th></tr></thead>
+                                <tbody id="tbodyAllocation"></tbody>
+                            </table>
+                        </div>
+
+                        <!-- Max Matrix Table -->
+                        <div class="matrix-card">
+                            <div class="matrix-card-header">
+                                <span class="matrix-title">Max Claim Matrix</span>
+                                <span class="matrix-formula">Declared Max [Max]</span>
+                            </div>
+                            <table class="os-matrix-table" id="tableMax">
+                                <thead><tr><th>Proc</th><th>R_A</th><th>R_B</th><th>R_C</th></tr></thead>
+                                <tbody id="tbodyMax"></tbody>
+                            </table>
+                        </div>
+
+                        <!-- Need Matrix Table (Need = Max - Allocation) -->
+                        <div class="matrix-card need-matrix-card">
+                            <div class="matrix-card-header">
+                                <span class="matrix-title">Need Matrix</span>
+                                <span class="matrix-formula highlight-formula">Need = Max − Allocation</span>
+                            </div>
+                            <table class="os-matrix-table" id="tableNeed">
+                                <thead><tr><th>Proc</th><th>R_A</th><th>R_B</th><th>R_C</th></tr></thead>
+                                <tbody id="tbodyNeed"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Interactive Custom Resource Request Tester -->
+                    <div class="banker-interactive-tester">
+                        <div class="tester-header">
+                            <span class="tester-title">🔬 Interactive Resource-Request Tester (Safety Evaluation)</span>
+                            <span class="tester-desc">Test whether granting request [Req_A, Req_B, Req_C] leaves system in a Safe or Unsafe State</span>
+                        </div>
+                        <div class="tester-controls-row">
+                            <div class="tester-field">
+                                <label for="reqProcSelect">Process:</label>
+                                <select id="reqProcSelect" class="styled-select-sm">
+                                    <option value="0">P0</option>
+                                    <option value="1" selected>P1</option>
+                                    <option value="2">P2</option>
+                                    <option value="3">P3</option>
+                                    <option value="4">P4</option>
+                                </select>
+                            </div>
+                            <div class="tester-field">
+                                <label for="reqValA">Req R_A:</label>
+                                <input type="number" id="reqValA" class="styled-num-sm" min="0" max="10" value="1">
+                            </div>
+                            <div class="tester-field">
+                                <label for="reqValB">Req R_B:</label>
+                                <input type="number" id="reqValB" class="styled-num-sm" min="0" max="5" value="0">
+                            </div>
+                            <div class="tester-field">
+                                <label for="reqValC">Req R_C:</label>
+                                <input type="number" id="reqValC" class="styled-num-sm" min="0" max="7" value="2">
+                            </div>
+                            <button type="button" id="btnTestBankerReq" class="btn btn-primary btn-sm">
+                                <span>Evaluate Request (Safety Test)</span>
+                            </button>
+                        </div>
+                        <div id="bankerTestResultBox" class="test-result-box hidden">
+                            <!-- Dynamic trace output -->
+                        </div>
+                    </div>
+
+                    <div class="scenario-memo">
+                        <p><strong>Banker's Algorithm Rule:</strong> When process requests resources: 1) Verify <code>Request ≤ Need</code>, 2) Verify <code>Request ≤ Available</code>, 3) Tentatively allocate and execute <strong>Safety Algorithm</strong> (<code>Work = Work + Allocation</code>). With <strong>SYNC ON</strong>, unsafe requests are rejected/delayed, guaranteeing <strong>Zero Deadlocks</strong>. With <strong>SYNC OFF</strong>, naive allocation triggers an <strong>Unsafe State</strong> and deadlock!</p>
                     </div>
                 </div>
             </section>

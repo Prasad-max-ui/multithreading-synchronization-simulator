@@ -65,6 +65,22 @@
         viewProducerConsumer: document.getElementById("viewProducerConsumer"),
         viewDiningPhilosophers: document.getElementById("viewDiningPhilosophers"),
         viewReadersWriters: document.getElementById("viewReadersWriters"),
+        viewBankersAlgorithm: document.getElementById("viewBankersAlgorithm"),
+        bankerSafetyStateBadge: document.getElementById("bankerSafetyStateBadge"),
+        bankerStateText: document.getElementById("bankerStateText"),
+        bankerSafeSeqText: document.getElementById("bankerSafeSeqText"),
+        availValA: document.getElementById("availValA"),
+        availValB: document.getElementById("availValB"),
+        availValC: document.getElementById("availValC"),
+        tbodyAllocation: document.getElementById("tbodyAllocation"),
+        tbodyMax: document.getElementById("tbodyMax"),
+        tbodyNeed: document.getElementById("tbodyNeed"),
+        reqProcSelect: document.getElementById("reqProcSelect"),
+        reqValA: document.getElementById("reqValA"),
+        reqValB: document.getElementById("reqValB"),
+        reqValC: document.getElementById("reqValC"),
+        btnTestBankerReq: document.getElementById("btnTestBankerReq"),
+        bankerTestResultBox: document.getElementById("bankerTestResultBox"),
         bufferOccupancy: document.getElementById("bufferOccupancy"),
         metricProduced: document.getElementById("metricProduced"),
         metricConsumed: document.getElementById("metricConsumed"),
@@ -161,6 +177,7 @@
         DOM.viewProducerConsumer.classList.remove("active");
         DOM.viewDiningPhilosophers.classList.remove("active");
         DOM.viewReadersWriters.classList.remove("active");
+        if (DOM.viewBankersAlgorithm) DOM.viewBankersAlgorithm.classList.remove("active");
 
         if (scenario === "producer_consumer") {
             DOM.viewProducerConsumer.classList.add("active");
@@ -182,6 +199,20 @@
             DOM.scenarioStageSubtitle.textContent = "Reader Preference vs Exclusive Writer Mutex";
             DOM.threadCountLabel.textContent = "Threads (Readers + Writers)";
             if (!state.isRunning) setThreadCount(5);
+        } else if (scenario === "bankers_algorithm") {
+            DOM.viewBankersAlgorithm.classList.add("active");
+            DOM.scenarioStageTitle.textContent = "Banker's Algorithm Matrix Lab";
+            DOM.scenarioStageSubtitle.textContent = "Dijkstra's Deadlock Avoidance & Safety Algorithm";
+            DOM.threadCountLabel.textContent = "Processes (P0 - P4)";
+            if (!state.isRunning) setThreadCount(5);
+            renderBankersAlgorithm({
+                available: [3, 3, 2],
+                allocation: [[0, 1, 0], [2, 0, 0], [3, 0, 2], [2, 1, 1], [0, 0, 2]],
+                max_matrix: [[7, 5, 3], [3, 2, 2], [9, 0, 2], [2, 2, 2], [4, 3, 3]],
+                need: [[7, 4, 3], [1, 2, 2], [6, 0, 0], [0, 1, 1], [4, 3, 1]],
+                is_currently_safe: true,
+                safe_sequence: [1, 3, 4, 0, 2]
+            });
         }
     }
 
@@ -421,6 +452,58 @@
         }
     }
 
+    // 4. Banker's Algorithm Matrix Lab View
+    function renderBankersAlgorithm(data) {
+        if (!DOM.viewBankersAlgorithm) return;
+
+        // 1. Safety State Badge
+        const isSafe = data.is_currently_safe !== undefined ? data.is_currently_safe : true;
+        if (isSafe) {
+            DOM.bankerSafetyStateBadge.className = "safety-state-badge badge-safe";
+            DOM.bankerStateText.textContent = "SAFE STATE";
+        } else {
+            DOM.bankerSafetyStateBadge.className = "safety-state-badge badge-unsafe";
+            DOM.bankerStateText.textContent = "UNSAFE STATE (DEADLOCK RISK)";
+        }
+
+        // 2. Safe Sequence Nodes
+        if (data.safe_sequence && data.safe_sequence.length > 0) {
+            const seqStr = data.safe_sequence.map(p => `P${p}`).join(" → ");
+            DOM.bankerSafeSeqText.textContent = `< ${seqStr} >`;
+            DOM.bankerSafeSeqText.style.color = "var(--accent-cyan)";
+        } else {
+            DOM.bankerSafeSeqText.textContent = "< None (No Safe Execution Order) >";
+            DOM.bankerSafeSeqText.style.color = "#ef4444";
+        }
+
+        // 3. Available Vector
+        if (data.available && data.available.length >= 3) {
+            DOM.availValA.textContent = data.available[0];
+            DOM.availValB.textContent = data.available[1];
+            DOM.availValC.textContent = data.available[2];
+        }
+
+        // 4. Matrix Tables: Allocation, Max, Need
+        function populateMatrixTable(tbodyEl, matrixData) {
+            if (!tbodyEl || !matrixData) return;
+            tbodyEl.innerHTML = "";
+            matrixData.forEach((row, idx) => {
+                const tr = document.createElement("tr");
+                tr.innerHTML = `
+                    <td class="proc-name-cell">P${idx}</td>
+                    <td>${row[0]}</td>
+                    <td>${row[1]}</td>
+                    <td>${row[2]}</td>
+                `;
+                tbodyEl.appendChild(tr);
+            });
+        }
+
+        populateMatrixTable(DOM.tbodyAllocation, data.allocation);
+        populateMatrixTable(DOM.tbodyMax, data.max_matrix);
+        populateMatrixTable(DOM.tbodyNeed, data.need);
+    }
+
     // =========================================================================
     // Thread Registry Cards
     // =========================================================================
@@ -645,6 +728,16 @@
             renderDiningTable(state.threadCount, [], [], []);
         } else if (state.scenario === "readers_writers") {
             renderReadersWriters({ record: { title: "OS Concurrency Ledger", version: 1, checksum: 1, content: "Clean reset state" } });
+        } else if (state.scenario === "bankers_algorithm") {
+            renderBankersAlgorithm({
+                available: [3, 3, 2],
+                allocation: [[0, 1, 0], [2, 0, 0], [3, 0, 2], [2, 1, 1], [0, 0, 2]],
+                max_matrix: [[7, 5, 3], [3, 2, 2], [9, 0, 2], [2, 2, 2], [4, 3, 3]],
+                need: [[7, 4, 3], [1, 2, 2], [6, 0, 0], [0, 1, 1], [4, 3, 1]],
+                is_currently_safe: true,
+                safe_sequence: [1, 3, 4, 0, 2]
+            });
+            if (DOM.bankerTestResultBox) DOM.bankerTestResultBox.classList.add("hidden");
         }
         addLogEntry(
             new Date().toLocaleTimeString(),
@@ -726,6 +819,44 @@
             renderThreadsGrid();
         }
         renderReadersWriters(data);
+    });
+
+    socket.on("banker_update", data => {
+        if (data.threads) {
+            state.threads = data.threads;
+            renderThreadsGrid();
+        }
+        if (data.is_deadlocked) {
+            setSimulationRunning(true, false, true);
+        }
+        renderBankersAlgorithm(data);
+    });
+
+    socket.on("banker_request_result", data => {
+        if (!DOM.bankerTestResultBox) return;
+        DOM.bankerTestResultBox.classList.remove("hidden", "result-success", "result-denied");
+        const status = data.status || "";
+        const isGranted = status.startsWith("GRANTED");
+        DOM.bankerTestResultBox.classList.add(isGranted ? "result-success" : "result-denied");
+
+        let traceHtml = `<strong>[EVALUATION] ${data.message || ''}</strong><br>`;
+        if (data.trace && data.trace.length > 0) {
+            traceHtml += `<div style="margin-top: 6px; font-size: 0.72rem; color: #94a3b8;">`;
+            data.trace.forEach(step => {
+                traceHtml += `<div>• ${step}</div>`;
+            });
+            traceHtml += `</div>`;
+        }
+        DOM.bankerTestResultBox.innerHTML = traceHtml;
+
+        addLogEntry(
+            new Date().toLocaleTimeString(),
+            data.process || "Banker",
+            isGranted ? "BANKER_SAFE_GRANT" : "BANKER_DENIED",
+            "Resource Pool",
+            data.message || "Evaluated resource request",
+            isGranted ? "sync" : "anomaly"
+        );
     });
 
     socket.on("anomaly_detected", data => {
@@ -851,6 +982,20 @@
             filterLogs(chip.dataset.filter);
         });
     });
+
+    // Banker's Algorithm custom request evaluation button
+    if (DOM.btnTestBankerReq) {
+        DOM.btnTestBankerReq.addEventListener("click", () => {
+            const pid = parseInt(DOM.reqProcSelect.value, 10);
+            const reqA = parseInt(DOM.reqValA.value, 10) || 0;
+            const reqB = parseInt(DOM.reqValB.value, 10) || 0;
+            const reqC = parseInt(DOM.reqValC.value, 10) || 0;
+            socket.emit("banker_custom_request", {
+                process_id: pid,
+                request: [reqA, reqB, reqC]
+            });
+        });
+    }
 
     // Initial setup on load
     switchScenarioView("producer_consumer");

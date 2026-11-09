@@ -28,7 +28,7 @@ class BaseScenario:
         self.stop_event = threading.Event()
         self.is_paused = False
         self.step_semaphore = threading.Semaphore(0)
-        self.state_lock = threading.Lock()
+        self.state_lock = threading.RLock()
 
         self.threads: Dict[str, Dict[str, Any]] = {}
         self.worker_threads: List[threading.Thread] = []
