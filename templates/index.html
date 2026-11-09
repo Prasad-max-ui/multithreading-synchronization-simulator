@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multithreading & Synchronization Simulator | OS Concurrency Lab</title>
+    <meta name="description" content="Interactive Operating System Concurrency Simulator. Demonstrates race conditions, deadlocks, locks, condition variables, and semaphores with live Python multithreading.">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css?v=2">
+    <!-- Socket.IO Client Library (Local) -->
+    <script src="/static/js/socket.io.min.js?v=2"></script>
+</head>
+<body class="dark-theme">
+    <div class="app-container">
+        <!-- TOP APP HEADER -->
+        <header class="app-header">
+            <div class="header-brand">
+                <div class="brand-icon">
+                    <span class="pulse-core"></span>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+                        <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+                        <line x1="6" y1="6" x2="6.01" y2="6"></line>
+                        <line x1="6" y1="18" x2="6.01" y2="18"></line>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="brand-title">Multithreading & Synchronization Simulator</h1>
+                    <p class="brand-subtitle">Real-Time Python OS Concurrency Engine & Race Condition Analyzer</p>
+                </div>
+            </div>
+
+            <div class="header-status">
+                <div id="connectionStatus" class="status-pill status-disconnected">
+                    <span class="status-dot"></span>
+                    <span id="connectionText">Connecting...</span>
+                </div>
+                <div id="simulationStatusPill" class="status-pill status-idle">
+                    <span class="status-dot"></span>
+                    <span id="simStatusText">IDLE</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- DEADLOCK WARNING BANNER (Dining Philosophers) -->
+        <div id="deadlockBanner" class="deadlock-banner hidden" role="alert">
+            <div class="deadlock-content">
+                <div class="deadlock-icon">⚠️</div>
+                <div class="deadlock-info">
+                    <h2 class="deadlock-title">DEADLOCK DETECTED! Circular Wait Condition Reached</h2>
+                    <p id="deadlockDescription" class="deadlock-desc">
+                        All philosophers are permanently blocked waiting for resources held by their neighbors. 
+                        All 4 Coffman conditions are fulfilled: Mutual Exclusion, Hold and Wait, No Preemption, and Circular Wait.
+                    </p>
+                </div>
+                <button id="deadlockResetBtn" class="btn btn-danger-action">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
+                    Recover via Reset
+                </button>
+            </div>
+        </div>
+
+        <!-- ANOMALY HUD (Visible when Sync Mode is OFF) -->
+        <div id="anomalyPanel" class="anomaly-hud hidden">
+            <div class="anomaly-badge-wrapper">
+                <div class="anomaly-counter-box">
+                    <span class="anomaly-label">RACE CONDITION ANOMALIES</span>
+                    <span id="anomalyTotalCount" class="anomaly-number">0</span>
+                </div>
+                <div class="anomaly-details">
+                    <span class="anomaly-alert-tag">⚠️ UNSYNCHRONIZED EXECUTION</span>
+                    <p class="anomaly-subtext">Threads are accessing shared memory without synchronization primitives. Critical section invariants are actively violated!</p>
+                </div>
+            </div>
+            <div class="anomaly-breakdown" id="anomalyBreakdown">
+                <span class="breakdown-tag" id="tagOverflow" title="Buffer exceeded capacity">Overflows: 0</span>
+                <span class="breakdown-tag" id="tagUnderflow" title="Popped empty buffer">Underflows: 0</span>
+                <span class="breakdown-tag" id="tagDirtyRead" title="Read during concurrent write">Dirty Reads: 0</span>
+                <span class="breakdown-tag" id="tagTornRead" title="Inconsistent version vs checksum">Torn Reads: 0</span>
+                <span class="breakdown-tag" id="tagWriterConflict" title="Multiple writers active">Write Collisions: 0</span>
+            </div>
+        </div>
+
+        <!-- CONTROLS TOOLBAR -->
+        <section class="controls-toolbar glass-panel" aria-label="Simulation Controls">
+            <div class="control-group scenario-group">
+                <label for="scenarioSelect" class="control-label">Scenario</label>
+                <div class="select-wrapper">
+                    <select id="scenarioSelect" class="styled-select">
+                        <option value="producer_consumer" selected>Producer-Consumer (Bounded Buffer)</option>
+                        <option value="dining_philosophers">Dining Philosophers (Deadlock Simulation)</option>
+                        <option value="readers_writers">Readers-Writers (Shared Record Mutex)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="control-group sync-toggle-group">
+                <label class="control-label">Synchronization Mode</label>
+                <div class="toggle-container">
+                    <button type="button" id="syncToggleBtn" class="sync-switch sync-on" role="switch" aria-checked="true">
+                        <span class="switch-handle"></span>
+                        <span class="switch-label-on">SYNC ON</span>
+                        <span class="switch-label-off">SYNC OFF</span>
+                    </button>
+                    <span id="syncModeCaption" class="sync-caption caption-safe">Guaranteed Safe (Locks / Conditions)</span>
+                </div>
+            </div>
+
+            <div class="control-group thread-count-group">
+                <label for="threadCountInput" class="control-label" id="threadCountLabel">Threads (2–10)</label>
+                <div class="number-input-wrapper">
+                    <button type="button" id="btnThreadDec" class="btn-stepper" aria-label="Decrease thread count">-</button>
+                    <input type="number" id="threadCountInput" min="2" max="10" value="4" class="styled-number-input" readonly>
+                    <button type="button" id="btnThreadInc" class="btn-stepper" aria-label="Increase thread count">+</button>
+                </div>
+            </div>
+
+            <div class="control-group speed-group">
+                <div class="speed-label-wrapper">
+                    <label for="speedSlider" class="control-label">Simulation Speed</label>
+                    <span id="speedValue" class="speed-badge">1.0x</span>
+                </div>
+                <input type="range" id="speedSlider" min="0.3" max="3.0" step="0.1" value="1.0" class="styled-slider">
+            </div>
+
+            <div class="control-actions">
+                <button type="button" id="btnStart" class="btn btn-primary" title="Start simulation">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                    <span>Start</span>
+                </button>
+                <button type="button" id="btnPause" class="btn btn-warning" title="Pause simulation" disabled>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+                    <span id="pauseBtnText">Pause</span>
+                </button>
+                <button type="button" id="btnStep" class="btn btn-info" title="Advance one event while paused" disabled>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="3"></line></svg>
+                    <span>Step</span>
+                </button>
+                <button type="button" id="btnReset" class="btn btn-danger" title="Cleanly stop all threads and reset">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
+                    <span>Reset</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- MAIN DASHBOARD CONTENT -->
+        <main class="dashboard-grid">
+            <!-- SHARED RESOURCE VISUALIZATION STAGE -->
+            <section class="stage-container glass-panel" aria-label="Scenario Visualizer">
+                <div class="panel-header">
+                    <div class="panel-title-group">
+                        <h2 id="scenarioStageTitle" class="panel-title">Bounded Buffer Visualization</h2>
+                        <span id="scenarioStageSubtitle" class="panel-subtitle">Condition Variable & Mutex Monitoring</span>
+                    </div>
+                    <div class="stage-legend">
+                        <span class="legend-item"><span class="legend-dot dot-running"></span> [R] Running</span>
+                        <span class="legend-item"><span class="legend-dot dot-waiting"></span> [W] Waiting</span>
+                        <span class="legend-item"><span class="legend-dot dot-blocked"></span> [B] Blocked</span>
+                        <span class="legend-item"><span class="legend-dot dot-finished"></span> [F] Finished</span>
+                    </div>
+                </div>
+
+                <!-- VIEWPORT: PRODUCER-CONSUMER -->
+                <div id="viewProducerConsumer" class="scenario-viewport active">
+                    <div class="buffer-metrics-bar">
+                        <div class="metric-card">
+                            <span class="metric-title">Buffer Fill</span>
+                            <span id="bufferOccupancy" class="metric-value">0 / 5</span>
+                        </div>
+                        <div class="metric-card">
+                            <span class="metric-title">Total Produced</span>
+                            <span id="metricProduced" class="metric-value">0</span>
+                        </div>
+                        <div class="metric-card">
+                            <span class="metric-title">Total Consumed</span>
+                            <span id="metricConsumed" class="metric-value">0</span>
+                        </div>
+                    </div>
+
+                    <div class="buffer-visual-track">
+                        <div class="buffer-capacity-bar-container">
+                            <div id="bufferFillBar" class="buffer-fill-bar" style="width: 0%;"></div>
+                        </div>
+                        <div class="buffer-slots-container" id="bufferSlotsContainer">
+                            <!-- Populated via JS -->
+                        </div>
+                    </div>
+
+                    <div class="scenario-memo">
+                        <p><strong>Producer-Consumer Rule:</strong> Producers wait when buffer is FULL. Consumers wait when buffer is EMPTY. With <strong>SYNC ON</strong>, <code>Condition.wait()</code> and <code>notify_all()</code> prevent overflow/underflow. With <strong>SYNC OFF</strong>, uncoordinated access triggers race conditions!</p>
+                    </div>
+                </div>
+
+                <!-- VIEWPORT: DINING PHILOSOPHERS -->
+                <div id="viewDiningPhilosophers" class="scenario-viewport">
+                    <div class="table-stage-wrapper">
+                        <div class="dining-table-container" id="diningTableContainer">
+                            <div class="center-table-bowl">
+                                <span class="bowl-emoji">🍝</span>
+                                <span class="bowl-label">Shared Table</span>
+                            </div>
+                            <!-- Philosophers and forks injected dynamically -->
+                        </div>
+                    </div>
+                    <div class="scenario-memo">
+                        <p><strong>Dining Philosophers Rule:</strong> Each philosopher needs 2 forks to eat. With <strong>SYNC ON</strong>, resource hierarchy (asymmetric order) guarantees circular wait can never form. With <strong>SYNC OFF</strong>, all philosophers grab their left fork first, inducing Coffman <strong>Deadlock</strong>!</p>
+                    </div>
+                </div>
+
+                <!-- VIEWPORT: READERS-WRITERS -->
+                <div id="viewReadersWriters" class="scenario-viewport">
+                    <div class="rw-stage-wrapper">
+                        <!-- Active Readers Side -->
+                        <div class="rw-side rw-readers-side">
+                            <h3 class="rw-side-title">Active Readers (<span id="activeReadersCount">0</span>)</h3>
+                            <div id="activeReadersContainer" class="rw-tags-container">
+                                <span class="empty-hint">No active readers</span>
+                            </div>
+                        </div>
+
+                        <!-- Central Shared Record Display -->
+                        <div class="rw-center-record" id="rwRecordCard">
+                            <div class="record-header">
+                                <div class="record-badge" id="recordVersionBadge">v1</div>
+                                <span class="record-title" id="recordTitle">OS Concurrency Ledger</span>
+                                <div class="record-checksum-badge" id="recordChecksumBadge">Checksum: 1</div>
+                            </div>
+                            <div class="record-body">
+                                <p id="recordContent" class="record-text">Initial ledger state verified and consistent.</p>
+                            </div>
+                            <div class="record-footer">
+                                <span>Last Writer: <strong id="recordLastWriter">Genesis</strong></span>
+                                <span id="recordIntegrityStatus" class="integrity-tag integrity-ok">State: Consistent</span>
+                            </div>
+                        </div>
+
+                        <!-- Active Writers Side -->
+                        <div class="rw-side rw-writers-side">
+                            <h3 class="rw-side-title">Active Writers (<span id="activeWritersCount">0</span>)</h3>
+                            <div id="activeWritersContainer" class="rw-tags-container">
+                                <span class="empty-hint">No active writers</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="scenario-memo">
+                        <p><strong>Readers-Writers Rule:</strong> Multiple readers may read simultaneously, but writers require exclusive access. With <strong>SYNC ON</strong>, mutual exclusion is preserved. With <strong>SYNC OFF</strong>, readers experience dirty reads and torn states!</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- WORKER THREADS MONITOR -->
+            <section class="threads-container glass-panel" aria-label="Worker Threads List">
+                <div class="panel-header">
+                    <div>
+                        <h2 class="panel-title">Thread Registry</h2>
+                        <span class="panel-subtitle">Real Python <code>threading.Thread</code> Instances</span>
+                    </div>
+                    <span id="activeThreadCountBadge" class="count-pill">0 Threads</span>
+                </div>
+                <div id="threadsGrid" class="threads-grid">
+                    <div class="threads-empty-state">
+                        <p>No active simulation threads. Select parameters and click <strong>Start</strong> to launch real server threads.</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- MONOSPACE EVENT LOG PANEL -->
+        <section class="log-panel glass-panel" aria-label="Live Event Log">
+            <div class="log-header">
+                <div class="log-title-group">
+                    <div class="terminal-icon">
+                        <span></span><span></span><span></span>
+                    </div>
+                    <h2 class="log-title">Live Synchronization Event Stream</h2>
+                    <span id="logEventCount" class="log-count-pill">0 events</span>
+                </div>
+
+                <div class="log-controls">
+                    <div class="log-filters">
+                        <button type="button" class="filter-chip active" data-filter="all">All</button>
+                        <button type="button" class="filter-chip" data-filter="sync">Sync</button>
+                        <button type="button" class="filter-chip" data-filter="state">State</button>
+                        <button type="button" class="filter-chip" data-filter="anomaly">Anomalies</button>
+                    </div>
+                    <label class="autoscroll-toggle">
+                        <input type="checkbox" id="chkAutoScroll" checked>
+                        <span>Auto-scroll</span>
+                    </label>
+                    <button type="button" id="btnClearLog" class="btn-clear-log" title="Clear event log">Clear</button>
+                </div>
+            </div>
+
+            <div id="eventLogContainer" class="event-log-container font-mono">
+                <!-- Live logs streamed here -->
+                <div class="log-entry log-system">
+                    <span class="log-time">[System]</span>
+                    <span class="log-thread">Kernel</span>
+                    <span class="log-badge badge-info">READY</span>
+                    <span class="log-res">Simulator</span>
+                    <span class="log-msg">Socket.IO event bridge ready. Select a scenario and press Start.</span>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Application Script -->
+    <script src="/static/js/app.js?v=2"></script>
+</body>
+</html>
