@@ -29,39 +29,6 @@ An educational web application built with **Python (Flask + Flask-SocketIO + nat
 
 ---
 
-## 📂 Project Architecture
-
-```
-midsem/
-├── app.py                     # Flask + Flask-SocketIO server and WebSocket handlers
-├── requirements.txt           # Project dependencies
-├── sync/
-│   ├── __init__.py
-│   └── instrumented.py        # InstrumentedLock, Semaphore, and Condition wrappers
-├── scenarios/
-│   ├── __init__.py
-│   ├── base_scenario.py       # Thread lifecycle, pause/step hooks, exception isolation
-│   ├── producer_consumer.py   # Bounded buffer simulation (Sync ON vs OFF)
-│   ├── dining_philosophers.py # 5 philosophers, forks, circular wait deadlock
-│   ├── readers_writers.py     # Shared record mutex, dirty/torn read detection
-│   └── bankers_algorithm.py   # Banker's Deadlock Avoidance, Safety Algorithm, Matrices
-├── static/
-│   ├── css/
-│   │   └── style.css          # Dark-mode glassmorphic design system and animations
-│   └── js/
-│       └── app.js             # WebSocket client, SVG/DOM visualizers, log engine
-├── templates/
-│   └── index.html             # Single-page application dashboard
-├── tests/
-│   ├── __init__.py
-│   ├── test_sync_wrappers.py  # Unit tests for locks, semaphores, and conditions
-│   └── test_scenarios.py      # Unit tests for all four concurrency scenarios
-├── PRESENTATION_SLIDES.md     # 8-Slide master presentation deck with 5-member pitch scripts
-└── README.md
-```
-
----
-
 ## 🚀 Getting Started
 
 ### 1. Prerequisites
