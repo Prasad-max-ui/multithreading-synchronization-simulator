@@ -48,6 +48,8 @@
         tagWriterConflict: document.getElementById("tagWriterConflict"),
         scenarioSelect: document.getElementById("scenarioSelect"),
         syncToggleBtn: document.getElementById("syncToggleBtn"),
+        btnModeProblem: document.getElementById("btnModeProblem"),
+        btnModeSolution: document.getElementById("btnModeSolution"),
         syncModeCaption: document.getElementById("syncModeCaption"),
         threadCountInput: document.getElementById("threadCountInput"),
         threadCountLabel: document.getElementById("threadCountLabel"),
@@ -86,7 +88,57 @@
         metricConsumed: document.getElementById("metricConsumed"),
         bufferFillBar: document.getElementById("bufferFillBar"),
         bufferSlotsContainer: document.getElementById("bufferSlotsContainer"),
+        bufferInvariantBadge: document.getElementById("bufferInvariantBadge"),
+        semEmptyVal: document.getElementById("semEmptyVal"),
+        semFullVal: document.getElementById("semFullVal"),
+        mutexLockVal: document.getElementById("mutexLockVal"),
+        mutexHolderDesc: document.getElementById("mutexHolderDesc"),
+        condVariablesVal: document.getElementById("condVariablesVal"),
+        condWaitingDesc: document.getElementById("condWaitingDesc"),
+        bufferLastActionText: document.getElementById("bufferLastActionText"),
         diningTableContainer: document.getElementById("diningTableContainer"),
+        badgeCoffmanMutex: document.getElementById("badgeCoffmanMutex"),
+        badgeCoffmanHoldWait: document.getElementById("badgeCoffmanHoldWait"),
+        badgeCoffmanNoPreempt: document.getElementById("badgeCoffmanNoPreempt"),
+        badgeCoffmanCircularWait: document.getElementById("badgeCoffmanCircularWait"),
+        descCoffmanCircularWait: document.getElementById("descCoffmanCircularWait"),
+        deadlockLikelihoodBadge: document.getElementById("deadlockLikelihoodBadge"),
+        ragSvg: document.getElementById("ragSvg"),
+        acquisitionOrderList: document.getElementById("acquisitionOrderList"),
+        mealsProgressGrid: document.getElementById("mealsProgressGrid"),
+        totalMealsCount: document.getElementById("totalMealsCount"),
+        deadlockRiskVal: document.getElementById("deadlockRiskVal"),
+        livenessGuaranteeBadge: document.getElementById("livenessGuaranteeBadge"),
+        rwSyncInstruments: document.getElementById("rwSyncInstruments"),
+        rwInvariantWriterMutex: document.getElementById("rwInvariantWriterMutex"),
+        rwInvariantIntegrity: document.getElementById("rwInvariantIntegrity"),
+        rwReadCountVal: document.getElementById("rwReadCountVal"),
+        rwReadCountDesc: document.getElementById("rwReadCountDesc"),
+        rwReadMutexVal: document.getElementById("rwReadMutexVal"),
+        rwWriteLockVal: document.getElementById("rwWriteLockVal"),
+        rwLockHolderDesc: document.getElementById("rwLockHolderDesc"),
+        rwAccessStateVal: document.getElementById("rwAccessStateVal"),
+        rwAccessStateDesc: document.getElementById("rwAccessStateDesc"),
+        blockedReadersBadge: document.getElementById("blockedReadersBadge"),
+        blockedReadersContainer: document.getElementById("blockedReadersContainer"),
+        blockedWritersBadge: document.getElementById("blockedWritersBadge"),
+        blockedWritersContainer: document.getElementById("blockedWritersContainer"),
+        rwDirtyReadStat: document.getElementById("rwDirtyReadStat"),
+        rwTornReadStat: document.getElementById("rwTornReadStat"),
+        rwCollisionStat: document.getElementById("rwCollisionStat"),
+        rwIntegrityStat: document.getElementById("rwIntegrityStat"),
+        bankerWorkInitial: document.getElementById("bankerWorkInitial"),
+        bankerStepByStepList: document.getElementById("bankerStepByStepList"),
+        bankerUnsafeExplBox: document.getElementById("bankerUnsafeExplBox"),
+        bankerUnsafeExplText: document.getElementById("bankerUnsafeExplText"),
+        btnDemoSafeReq: document.getElementById("btnDemoSafeReq"),
+        btnDemoUnsafeReq: document.getElementById("btnDemoUnsafeReq"),
+        btnDemoExceedReq: document.getElementById("btnDemoExceedReq"),
+        bankerRollbackBadge: document.getElementById("bankerRollbackBadge"),
+        pcVerificationBadge: document.getElementById("pcVerificationBadge"),
+        dpVerificationBadge: document.getElementById("dpVerificationBadge"),
+        rwVerificationBadge: document.getElementById("rwVerificationBadge"),
+        baVerificationBadge: document.getElementById("baVerificationBadge"),
         activeReadersCount: document.getElementById("activeReadersCount"),
         activeReadersContainer: document.getElementById("activeReadersContainer"),
         rwRecordCard: document.getElementById("rwRecordCard"),
@@ -158,6 +210,8 @@
         const disableConfig = running && !paused;
         DOM.scenarioSelect.disabled = running;
         DOM.syncToggleBtn.disabled = running;
+        if (DOM.btnModeProblem) DOM.btnModeProblem.disabled = running;
+        if (DOM.btnModeSolution) DOM.btnModeSolution.disabled = running;
         DOM.btnThreadDec.disabled = running;
         DOM.btnThreadInc.disabled = running;
 
@@ -185,20 +239,60 @@
             DOM.scenarioStageSubtitle.textContent = "Condition Variable & Mutex Monitoring";
             DOM.threadCountLabel.textContent = "Threads (Producers + Consumers)";
             if (!state.isRunning) setThreadCount(4);
-            renderBufferSlots(5, []);
+            renderProducerConsumer({
+                capacity: 5,
+                buffer: [],
+                total_produced: 0,
+                total_consumed: 0,
+                sem_empty: 5,
+                sem_full: 0,
+                sem_mutex: 1,
+                last_sync_action: "Bounded buffer ready. Set mode and click Start."
+            });
         } else if (scenario === "dining_philosophers") {
             DOM.viewDiningPhilosophers.classList.add("active");
             DOM.scenarioStageTitle.textContent = "Dining Philosophers Table";
             DOM.scenarioStageSubtitle.textContent = "Circular Wait & Deadlock Avoidance";
             DOM.threadCountLabel.textContent = "Philosophers (and Forks)";
             if (!state.isRunning) setThreadCount(5);
-            renderDiningTable(5, [], [], []);
+            renderDiningPhilosophers({
+                num_philosophers: 5,
+                philosopher_status: ["THINKING", "THINKING", "THINKING", "THINKING", "THINKING"],
+                fork_owners: [-1, -1, -1, -1, -1],
+                eat_counts: [0, 0, 0, 0, 0],
+                total_meals: 0,
+                rag: { allocation_edges: [], request_edges: [], cycle_detected: false },
+                coffman: { mutual_exclusion: true, hold_and_wait: false, no_preemption: true, circular_wait: false },
+                acquisition_orders: [
+                    { phil: 0, first_fork: 0, second_fork: 1, rule: "min(0,1) then max(0,1)", is_asymmetric: false },
+                    { phil: 1, first_fork: 1, second_fork: 2, rule: "min(1,2) then max(1,2)", is_asymmetric: false },
+                    { phil: 2, first_fork: 2, second_fork: 3, rule: "min(2,3) then max(2,3)", is_asymmetric: false },
+                    { phil: 3, first_fork: 3, second_fork: 4, rule: "min(3,4) then max(3,4)", is_asymmetric: false },
+                    { phil: 4, first_fork: 0, second_fork: 4, rule: "min(0,4) then max(0,4) (ASYMMETRIC)", is_asymmetric: true }
+                ]
+            });
         } else if (scenario === "readers_writers") {
             DOM.viewReadersWriters.classList.add("active");
             DOM.scenarioStageTitle.textContent = "Shared Database Record";
             DOM.scenarioStageSubtitle.textContent = "Reader Preference vs Exclusive Writer Mutex";
             DOM.threadCountLabel.textContent = "Threads (Readers + Writers)";
             if (!state.isRunning) setThreadCount(5);
+            renderReadersWriters({
+                record: { title: "OS Concurrency Ledger", version: 1, checksum: 1, content: "Initial verified state", last_writer: "Genesis" },
+                active_readers: [],
+                active_writers: [],
+                waiting_readers: [],
+                waiting_writers: [],
+                read_count: 0,
+                read_count_mutex_locked: false,
+                resource_write_lock_locked: false,
+                resource_write_lock_holder: null,
+                dirty_read_count: 0,
+                torn_read_count: 0,
+                collision_count: 0,
+                invariant_writer_mutex: true,
+                invariant_integrity: true
+            });
         } else if (scenario === "bankers_algorithm") {
             DOM.viewBankersAlgorithm.classList.add("active");
             DOM.scenarioStageTitle.textContent = "Banker's Algorithm Matrix Lab";
@@ -211,7 +305,14 @@
                 max_matrix: [[7, 5, 3], [3, 2, 2], [9, 0, 2], [2, 2, 2], [4, 3, 3]],
                 need: [[7, 4, 3], [1, 2, 2], [6, 0, 0], [0, 1, 1], [4, 3, 1]],
                 is_currently_safe: true,
-                safe_sequence: [1, 3, 4, 0, 2]
+                safe_sequence: [1, 3, 4, 0, 2],
+                safety_step_details: [
+                    { step: 1, process: 1, need: [1, 2, 2], work_before: [3, 3, 2], can_finish: true, alloc: [2, 0, 0], work_after: [5, 3, 2], finish_array: [false, true, false, false, false], safe_seq_so_far: [1] },
+                    { step: 2, process: 3, need: [0, 1, 1], work_before: [5, 3, 2], can_finish: true, alloc: [2, 1, 1], work_after: [7, 4, 3], finish_array: [false, true, false, true, false], safe_seq_so_far: [1, 3] },
+                    { step: 3, process: 4, need: [4, 3, 1], work_before: [7, 4, 3], can_finish: true, alloc: [0, 0, 2], work_after: [7, 4, 5], finish_array: [false, true, false, true, true], safe_seq_so_far: [1, 3, 4] },
+                    { step: 4, process: 0, need: [7, 4, 3], work_before: [7, 4, 5], can_finish: true, alloc: [0, 1, 0], work_after: [7, 5, 5], finish_array: [true, true, false, true, true], safe_seq_so_far: [1, 3, 4, 0] },
+                    { step: 5, process: 2, need: [6, 0, 0], work_before: [7, 5, 5], can_finish: true, alloc: [3, 0, 2], work_after: [10, 5, 7], finish_array: [true, true, true, true, true], safe_seq_so_far: [1, 3, 4, 0, 2] }
+                ]
             });
         }
     }
@@ -219,16 +320,20 @@
     function setSyncMode(syncOn) {
         state.syncMode = syncOn;
         if (syncOn) {
-            DOM.syncToggleBtn.className = "sync-switch sync-on";
+            if (DOM.btnModeSolution) DOM.btnModeSolution.classList.add("active");
+            if (DOM.btnModeProblem) DOM.btnModeProblem.classList.remove("active");
+            DOM.syncToggleBtn.className = "sync-switch sync-on hidden";
             DOM.syncToggleBtn.setAttribute("aria-checked", "true");
             DOM.syncModeCaption.className = "sync-caption caption-safe";
-            DOM.syncModeCaption.textContent = "Guaranteed Safe (Locks / Conditions)";
+            DOM.syncModeCaption.textContent = "Solution Mode: Active synchronization guarantees invariant preservation";
             DOM.anomalyPanel.classList.add("hidden");
         } else {
-            DOM.syncToggleBtn.className = "sync-switch sync-off";
+            if (DOM.btnModeSolution) DOM.btnModeSolution.classList.remove("active");
+            if (DOM.btnModeProblem) DOM.btnModeProblem.classList.add("active");
+            DOM.syncToggleBtn.className = "sync-switch sync-off hidden";
             DOM.syncToggleBtn.setAttribute("aria-checked", "false");
             DOM.syncModeCaption.className = "sync-caption caption-danger";
-            DOM.syncModeCaption.textContent = "Unsynchronized (Races & Anomalies Visible)";
+            DOM.syncModeCaption.textContent = "Problem Mode: Unsynchronized access exposes races, collisions & deadlocks";
             DOM.anomalyPanel.classList.remove("hidden");
         }
     }
@@ -285,7 +390,7 @@
     // Scenario Visualizer Renderers
     // =========================================================================
 
-    // 1. Producer-Consumer Buffer View
+    // 1. Producer-Consumer Bounded Buffer View
     function renderBufferSlots(capacity, bufferItems) {
         DOM.bufferSlotsContainer.innerHTML = "";
         const occupancy = bufferItems.length;
@@ -326,9 +431,75 @@
         }
     }
 
-    // 2. Dining Philosophers Circular Table View
+    function renderProducerConsumer(data) {
+        const capacity = data.capacity || 5;
+        const bufferItems = data.buffer || [];
+        renderBufferSlots(capacity, bufferItems);
+
+        // Semaphores & Mutex HUD
+        if (DOM.semEmptyVal) {
+            DOM.semEmptyVal.textContent = data.sem_empty !== undefined ? data.sem_empty : Math.max(0, capacity - bufferItems.length);
+        }
+        if (DOM.semFullVal) {
+            DOM.semFullVal.textContent = data.sem_full !== undefined ? data.sem_full : bufferItems.length;
+        }
+        if (DOM.mutexLockVal) {
+            if (data.sem_mutex === 0) {
+                DOM.mutexLockVal.textContent = "0 (LOCKED)";
+                DOM.mutexLockVal.style.color = "#f59e0b";
+                if (DOM.mutexHolderDesc) DOM.mutexHolderDesc.textContent = `Held by ${data.mutex_holder || 'worker thread'}`;
+            } else {
+                DOM.mutexLockVal.textContent = "1 (FREE)";
+                DOM.mutexLockVal.style.color = "var(--state-running)";
+                if (DOM.mutexHolderDesc) DOM.mutexHolderDesc.textContent = "Critical section unlocked";
+            }
+        }
+
+        // Condition Variables
+        const waitP = data.waiting_producers || 0;
+        const waitC = data.waiting_consumers || 0;
+        if (DOM.condVariablesVal) {
+            if (waitP > 0 || waitC > 0) {
+                DOM.condVariablesVal.textContent = "WAITING";
+                DOM.condVariablesVal.style.color = "#a78bfa";
+            } else {
+                DOM.condVariablesVal.textContent = "Ready";
+                DOM.condVariablesVal.style.color = "var(--text-primary)";
+            }
+        }
+        if (DOM.condWaitingDesc) {
+            DOM.condWaitingDesc.textContent = `Waiting: ${waitP} producers, ${waitC} consumers`;
+        }
+
+        // Buffer Boundary Invariant: 0 <= buffer_size <= capacity
+        const invariantPreserved = data.invariant_preserved !== undefined ? data.invariant_preserved : (bufferItems.length <= capacity && bufferItems.length >= 0);
+        if (DOM.bufferInvariantBadge) {
+            if (invariantPreserved) {
+                DOM.bufferInvariantBadge.className = "invariant-pill invariant-ok font-mono";
+                DOM.bufferInvariantBadge.textContent = `Invariant: 0 ≤ Size (${bufferItems.length}) ≤ ${capacity} [PRESERVED]`;
+            } else {
+                DOM.bufferInvariantBadge.className = "invariant-pill invariant-violated font-mono";
+                DOM.bufferInvariantBadge.textContent = `Invariant: VIOLATED (Size=${bufferItems.length} > ${capacity})`;
+            }
+        }
+
+        if (DOM.pcVerificationBadge) {
+            if (invariantPreserved) {
+                DOM.pcVerificationBadge.className = "verification-status-badge status-verified-green font-mono";
+                DOM.pcVerificationBadge.textContent = "Verification: PASS (0 ≤ Size ≤ Capacity Guaranteed)";
+            } else {
+                DOM.pcVerificationBadge.className = "verification-status-badge status-verified-red font-mono";
+                DOM.pcVerificationBadge.textContent = "Verification: FAIL (Buffer Boundary Violated)";
+            }
+        }
+
+        if (DOM.bufferLastActionText && data.last_sync_action) {
+            DOM.bufferLastActionText.textContent = data.last_sync_action;
+        }
+    }
+
+    // 2. Dining Philosophers Table, Coffman HUD, RAG, and Hierarchy View
     function renderDiningTable(numPhilosophers, philosopherStatus, forkOwners, eatCounts) {
-        // Clear previous philosophers & forks
         const existingDynamic = DOM.diningTableContainer.querySelectorAll(".philosopher-node, .fork-item");
         existingDynamic.forEach(el => el.remove());
 
@@ -351,32 +522,32 @@
             philEl.style.left = `${px}px`;
             philEl.style.top = `${py}px`;
 
-            let icon = "🤔";
+            let statusLabel = "THK";
             if (status === "THINKING") {
                 philEl.classList.add("state-thinking");
-                icon = "💭";
+                statusLabel = "THK";
             } else if (status === "HUNGRY") {
                 philEl.classList.add("state-hungry");
-                icon = "⏳";
+                statusLabel = "HUN";
             } else if (status === "WAITING_FOR_FORK") {
                 philEl.classList.add("state-waiting-fork");
-                icon = "⛔";
+                statusLabel = "BLK";
             } else if (status === "EATING") {
                 philEl.classList.add("state-eating");
-                icon = "🍝";
+                statusLabel = "EAT";
             }
 
             philEl.innerHTML = `
-                <span class="phil-icon">${icon}</span>
-                <span class="phil-name">P-${i} (${meals})</span>
+                <span class="phil-icon font-mono">${statusLabel}</span>
+                <span class="phil-name">P${i} [${meals}]</span>
             `;
             philEl.title = `Philosopher ${i}: ${status} | Meals: ${meals}`;
             DOM.diningTableContainer.appendChild(philEl);
 
             // Fork positioning (between philosopher i and (i+1)%numPhilosophers)
             const forkAngle = angle + Math.PI / numPhilosophers;
-            const fx = centerX + radiusFork * Math.cos(forkAngle) - 14;
-            const fy = centerY + radiusFork * Math.sin(forkAngle) - 14;
+            const fx = centerX + radiusFork * Math.cos(forkAngle) - 13;
+            const fy = centerY + radiusFork * Math.sin(forkAngle) - 13;
 
             const forkOwner = forkOwners[i] !== undefined ? forkOwners[i] : -1;
             const forkEl = document.createElement("div");
@@ -387,27 +558,287 @@
 
             if (forkOwner === -1) {
                 forkEl.classList.add("fork-free");
-                forkEl.innerHTML = `🍴`;
+                forkEl.textContent = `F${i}`;
                 forkEl.title = `Fork ${i}: On Table (Free)`;
             } else {
                 forkEl.classList.add("fork-held");
-                forkEl.innerHTML = `🍴`;
+                forkEl.textContent = `F${i}`;
                 forkEl.title = `Fork ${i}: Held by Philosopher ${forkOwner}`;
             }
             DOM.diningTableContainer.appendChild(forkEl);
         }
     }
 
-    // 3. Readers-Writers Shared Record View
+    function updateCoffmanCard(badgeEl, isMet, metText, unmetText) {
+        if (!badgeEl) return;
+        if (isMet) {
+            badgeEl.className = "coffman-status-badge badge-active";
+            badgeEl.textContent = metText;
+        } else {
+            badgeEl.className = "coffman-status-badge badge-inactive";
+            badgeEl.textContent = unmetText;
+        }
+    }
+
+    function renderRAG(rag) {
+        if (!DOM.ragSvg) return;
+        const svg = DOM.ragSvg;
+        svg.innerHTML = `
+            <defs>
+                <marker id="arrow-blue" viewBox="0 0 10 10" refX="16" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                    <path d="M 0 1 L 10 5 L 0 9 z" fill="#3b82f6" />
+                </marker>
+                <marker id="arrow-orange" viewBox="0 0 10 10" refX="16" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                    <path d="M 0 1 L 10 5 L 0 9 z" fill="#f59e0b" />
+                </marker>
+                <marker id="arrow-red" viewBox="0 0 10 10" refX="16" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                    <path d="M 0 1 L 10 5 L 0 9 z" fill="#ef4444" />
+                </marker>
+            </defs>
+        `;
+
+        const numNodes = 5;
+        const pCoords = [];
+        const fCoords = [];
+        const startX = 76;
+        const spacingX = 152;
+        const py = 45;
+        const fy = 155;
+
+        for (let i = 0; i < numNodes; i++) {
+            pCoords.push({ x: startX + i * spacingX, y: py });
+            fCoords.push({ x: startX + i * spacingX, y: fy });
+        }
+
+        const isCycle = rag && rag.cycle_detected;
+
+        // Draw Allocation Edges: Fork -> Philosopher (Solid Blue / Red if Cycle)
+        const allocEdges = (rag && rag.allocation_edges) || [];
+        allocEdges.forEach(edge => {
+            const from = fCoords[edge.from];
+            const to = pCoords[edge.to];
+            if (from && to) {
+                const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                line.setAttribute("x1", from.x);
+                line.setAttribute("y1", from.y);
+                line.setAttribute("x2", to.x);
+                line.setAttribute("y2", to.y);
+                line.setAttribute("stroke", isCycle ? "#ef4444" : "#3b82f6");
+                line.setAttribute("stroke-width", isCycle ? "2.5" : "1.8");
+                line.setAttribute("marker-end", isCycle ? "url(#arrow-red)" : "url(#arrow-blue)");
+                svg.appendChild(line);
+            }
+        });
+
+        // Draw Request Edges: Philosopher -> Fork (Dashed Orange / Solid Red if Cycle)
+        const reqEdges = (rag && rag.request_edges) || [];
+        reqEdges.forEach(edge => {
+            const from = pCoords[edge.from];
+            const to = fCoords[edge.to];
+            if (from && to) {
+                const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                line.setAttribute("x1", from.x);
+                line.setAttribute("y1", from.y);
+                line.setAttribute("x2", to.x);
+                line.setAttribute("y2", to.y);
+                line.setAttribute("stroke", isCycle ? "#ef4444" : "#f59e0b");
+                line.setAttribute("stroke-width", isCycle ? "2.5" : "1.8");
+                if (!isCycle) line.setAttribute("stroke-dasharray", "4,3");
+                line.setAttribute("marker-end", isCycle ? "url(#arrow-red)" : "url(#arrow-orange)");
+                svg.appendChild(line);
+            }
+        });
+
+        // Draw Process Nodes (Circles on Top)
+        pCoords.forEach((pt, i) => {
+            const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+            const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            circle.setAttribute("cx", pt.x);
+            circle.setAttribute("cy", pt.y);
+            circle.setAttribute("r", "16");
+            circle.setAttribute("fill", isCycle ? "rgba(239, 68, 68, 0.2)" : "#182030");
+            circle.setAttribute("stroke", isCycle ? "#ef4444" : "#38bdf8");
+            circle.setAttribute("stroke-width", "1.8");
+
+            const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            text.setAttribute("x", pt.x);
+            text.setAttribute("y", pt.y + 4);
+            text.setAttribute("text-anchor", "middle");
+            text.setAttribute("fill", "#ffffff");
+            text.setAttribute("font-family", "ui-monospace, monospace");
+            text.setAttribute("font-size", "11px");
+            text.setAttribute("font-weight", "bold");
+            text.textContent = `P${i}`;
+
+            g.appendChild(circle);
+            g.appendChild(text);
+            svg.appendChild(g);
+        });
+
+        // Draw Resource Nodes (Squares on Bottom)
+        fCoords.forEach((pt, i) => {
+            const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+            const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            rect.setAttribute("x", pt.x - 14);
+            rect.setAttribute("y", pt.y - 14);
+            rect.setAttribute("width", "28");
+            rect.setAttribute("height", "28");
+            rect.setAttribute("rx", "4");
+            rect.setAttribute("fill", "#182030");
+            rect.setAttribute("stroke", isCycle ? "#ef4444" : "#a855f7");
+            rect.setAttribute("stroke-width", "1.8");
+
+            const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            text.setAttribute("x", pt.x);
+            text.setAttribute("y", pt.y + 4);
+            text.setAttribute("text-anchor", "middle");
+            text.setAttribute("fill", "#ffffff");
+            text.setAttribute("font-family", "ui-monospace, monospace");
+            text.setAttribute("font-size", "11px");
+            text.setAttribute("font-weight", "bold");
+            text.textContent = `F${i}`;
+
+            g.appendChild(rect);
+            g.appendChild(text);
+            svg.appendChild(g);
+        });
+    }
+
+    function renderHierarchyMonitor(data) {
+        if (DOM.acquisitionOrderList && data.acquisition_orders) {
+            DOM.acquisitionOrderList.innerHTML = "";
+            data.acquisition_orders.forEach(ao => {
+                const pill = document.createElement("div");
+                pill.className = `acquisition-pill ${ao.is_asymmetric ? 'asymmetric-pill' : ''}`;
+                pill.innerHTML = `
+                    <span><strong>P${ao.phil}:</strong> Acquire F${ao.first_fork} then F${ao.second_fork}</span>
+                    <span style="color: ${ao.is_asymmetric ? 'var(--accent-cyan)' : 'var(--text-muted)'}; font-size: 0.62rem;">${ao.rule}</span>
+                `;
+                DOM.acquisitionOrderList.appendChild(pill);
+            });
+        }
+
+        if (DOM.mealsProgressGrid && data.eat_counts) {
+            DOM.mealsProgressGrid.innerHTML = "";
+            data.eat_counts.forEach((cnt, idx) => {
+                const box = document.createElement("div");
+                box.className = "meal-bar-item";
+                box.innerHTML = `
+                    <div class="meal-bar-pname">P${idx}</div>
+                    <div class="meal-bar-count font-mono">${cnt}</div>
+                `;
+                DOM.mealsProgressGrid.appendChild(box);
+            });
+        }
+
+        if (DOM.totalMealsCount && data.total_meals !== undefined) {
+            DOM.totalMealsCount.textContent = data.total_meals;
+        }
+
+        if (DOM.deadlockRiskVal) {
+            if (data.is_deadlocked) {
+                DOM.deadlockRiskVal.textContent = "100.0% (DEADLOCK)";
+                DOM.deadlockRiskVal.style.color = "var(--state-blocked)";
+            } else if (state.syncMode) {
+                DOM.deadlockRiskVal.textContent = "0.0% (Guaranteed Safe)";
+                DOM.deadlockRiskVal.style.color = "var(--state-running)";
+            } else {
+                DOM.deadlockRiskVal.textContent = "High (Symmetric Contention)";
+                DOM.deadlockRiskVal.style.color = "#f59e0b";
+            }
+        }
+
+        if (DOM.livenessGuaranteeBadge) {
+            if (state.syncMode) {
+                DOM.livenessGuaranteeBadge.className = "invariant-pill invariant-ok font-mono";
+                DOM.livenessGuaranteeBadge.textContent = "Progress Guaranteed (Circular Wait Broken)";
+            } else if (data.is_deadlocked) {
+                DOM.livenessGuaranteeBadge.className = "invariant-pill invariant-violated font-mono";
+                DOM.livenessGuaranteeBadge.textContent = "Progress Blocked (Circular Wait Formed)";
+            } else {
+                DOM.livenessGuaranteeBadge.className = "invariant-pill font-mono";
+                DOM.livenessGuaranteeBadge.style.background = "rgba(245, 158, 11, 0.2)";
+                DOM.livenessGuaranteeBadge.style.color = "#fbbf24";
+                DOM.livenessGuaranteeBadge.textContent = "Symmetric Contention Active";
+            }
+        }
+    }
+
+    function renderDiningPhilosophers(data) {
+        renderDiningTable(
+            data.num_philosophers || state.threadCount,
+            data.philosopher_status || [],
+            data.fork_owners || [],
+            data.eat_counts || []
+        );
+
+        // Coffman Conditions Evaluation
+        if (data.coffman) {
+            const c = data.coffman;
+            const isMutexMet = typeof c.mutual_exclusion === 'object' ? !!c.mutual_exclusion.met : !!c.mutual_exclusion;
+            const isHoldWaitMet = typeof c.hold_and_wait === 'object' ? !!c.hold_and_wait.met : !!c.hold_and_wait;
+            const isNoPreemptMet = typeof c.no_preemption === 'object' ? !!c.no_preemption.met : !!c.no_preemption;
+            const isCircularWaitMet = typeof c.circular_wait === 'object' ? !!c.circular_wait.met : !!c.circular_wait;
+            const isAllMet = c.all_met !== undefined ? !!c.all_met : (isMutexMet && isHoldWaitMet && isNoPreemptMet && isCircularWaitMet);
+
+            updateCoffmanCard(DOM.badgeCoffmanMutex, isMutexMet, "MET", "FREE");
+            updateCoffmanCard(DOM.badgeCoffmanHoldWait, isHoldWaitMet, "MET (1 Fork Held)", "INACTIVE");
+            updateCoffmanCard(DOM.badgeCoffmanNoPreempt, isNoPreemptMet, "MET", "PREEMPTIBLE");
+            updateCoffmanCard(DOM.badgeCoffmanCircularWait, isCircularWaitMet, "CYCLE ACTIVE", "BROKEN (Hierarchy)");
+
+            if (DOM.descCoffmanCircularWait) {
+                if (isCircularWaitMet) {
+                    DOM.descCoffmanCircularWait.textContent = "Closed wait cycle formed: all philosophers holding 1 fork, blocked on neighbor.";
+                    DOM.descCoffmanCircularWait.style.color = "#f87171";
+                } else {
+                    DOM.descCoffmanCircularWait.textContent = "Asymmetric fork hierarchy (min fork first) prevents circular dependency.";
+                    DOM.descCoffmanCircularWait.style.color = "var(--text-secondary)";
+                }
+            }
+
+            if (DOM.deadlockLikelihoodBadge) {
+                if (isAllMet || data.is_deadlocked) {
+                    DOM.deadlockLikelihoodBadge.className = "invariant-pill invariant-violated font-mono";
+                    DOM.deadlockLikelihoodBadge.textContent = "Coffman Conditions: 4/4 MET (DEADLOCKED)";
+                } else if (isHoldWaitMet) {
+                    DOM.deadlockLikelihoodBadge.className = "invariant-pill font-mono";
+                    DOM.deadlockLikelihoodBadge.style.background = "rgba(245, 158, 11, 0.2)";
+                    DOM.deadlockLikelihoodBadge.style.color = "#fbbf24";
+                    DOM.deadlockLikelihoodBadge.textContent = "Hold & Wait Detected (Contention)";
+                } else {
+                    DOM.deadlockLikelihoodBadge.className = "invariant-pill invariant-ok font-mono";
+                    DOM.deadlockLikelihoodBadge.textContent = "Progress Guaranteed (Circular Wait Broken)";
+                }
+            }
+        }
+
+        if (DOM.dpVerificationBadge) {
+            const isCircularWait = data.coffman && (typeof data.coffman.circular_wait === 'object' ? data.coffman.circular_wait.met : data.coffman.circular_wait);
+            if (!data.is_deadlocked && !isCircularWait) {
+                DOM.dpVerificationBadge.className = "verification-status-badge status-verified-green font-mono";
+                DOM.dpVerificationBadge.textContent = "Verification: PASS (Deadlock-Free, Circular Wait Broken)";
+            } else {
+                DOM.dpVerificationBadge.className = "verification-status-badge status-verified-red font-mono";
+                DOM.dpVerificationBadge.textContent = "Verification: FAIL (Deadlock Cycle Formed)";
+            }
+        }
+
+        renderRAG(data.rag);
+        renderHierarchyMonitor(data);
+    }
+
+    // 3. Readers-Writers Shared Record, Blocked Queues, and Mutex Invariants
     function renderReadersWriters(data) {
         const record = data.record || {};
         const activeReaders = data.active_readers || [];
         const activeWriters = data.active_writers || [];
+        const waitingReaders = data.waiting_readers || [];
+        const waitingWriters = data.waiting_writers || [];
 
         DOM.activeReadersCount.textContent = activeReaders.length;
         DOM.activeWritersCount.textContent = activeWriters.length;
 
-        // Render Active Readers Tags
+        // Active Readers Tags
         DOM.activeReadersContainer.innerHTML = "";
         if (activeReaders.length === 0) {
             DOM.activeReadersContainer.innerHTML = '<span class="empty-hint">No active readers</span>';
@@ -415,12 +846,12 @@
             activeReaders.forEach(reader => {
                 const tag = document.createElement("span");
                 tag.className = "rw-tag rw-tag-reader";
-                tag.textContent = `📖 ${reader}`;
+                tag.textContent = reader;
                 DOM.activeReadersContainer.appendChild(tag);
             });
         }
 
-        // Render Active Writers Tags
+        // Active Writers Tags
         DOM.activeWritersContainer.innerHTML = "";
         if (activeWriters.length === 0) {
             DOM.activeWritersContainer.innerHTML = '<span class="empty-hint">No active writers</span>';
@@ -428,20 +859,131 @@
             activeWriters.forEach(writer => {
                 const tag = document.createElement("span");
                 tag.className = "rw-tag rw-tag-writer";
-                tag.textContent = `✍️ ${writer}`;
+                tag.textContent = writer;
                 DOM.activeWritersContainer.appendChild(tag);
             });
         }
 
-        // Update Record Display
+        // Waiting / Blocked Queues
+        if (DOM.blockedReadersBadge) DOM.blockedReadersBadge.textContent = `${waitingReaders.length} waiting`;
+        if (DOM.blockedReadersContainer) {
+            DOM.blockedReadersContainer.innerHTML = "";
+            if (waitingReaders.length === 0) {
+                DOM.blockedReadersContainer.innerHTML = '<span class="empty-hint">No readers waiting for lock</span>';
+            } else {
+                waitingReaders.forEach(r => {
+                    const tag = document.createElement("span");
+                    tag.className = "queue-tag queue-tag-reader";
+                    tag.textContent = r;
+                    DOM.blockedReadersContainer.appendChild(tag);
+                });
+            }
+        }
+
+        if (DOM.blockedWritersBadge) DOM.blockedWritersBadge.textContent = `${waitingWriters.length} waiting`;
+        if (DOM.blockedWritersContainer) {
+            DOM.blockedWritersContainer.innerHTML = "";
+            if (waitingWriters.length === 0) {
+                DOM.blockedWritersContainer.innerHTML = '<span class="empty-hint">No writers waiting for lock</span>';
+            } else {
+                waitingWriters.forEach(w => {
+                    const tag = document.createElement("span");
+                    tag.className = "queue-tag queue-tag-writer";
+                    tag.textContent = w;
+                    DOM.blockedWritersContainer.appendChild(tag);
+                });
+            }
+        }
+
+        // Sync Instruments
+        if (DOM.rwReadCountVal) DOM.rwReadCountVal.textContent = data.read_count !== undefined ? data.read_count : activeReaders.length;
+        if (DOM.rwReadMutexVal) {
+            DOM.rwReadMutexVal.textContent = data.read_count_mutex_locked ? "0 (LOCKED)" : "1 (FREE)";
+            DOM.rwReadMutexVal.style.color = data.read_count_mutex_locked ? "#f59e0b" : "var(--state-running)";
+        }
+        if (DOM.rwWriteLockVal) {
+            DOM.rwWriteLockVal.textContent = data.resource_write_lock_locked ? "0 (LOCKED)" : "1 (FREE)";
+            DOM.rwWriteLockVal.style.color = data.resource_write_lock_locked ? "var(--state-blocked)" : "var(--state-running)";
+        }
+        if (DOM.rwLockHolderDesc) {
+            DOM.rwLockHolderDesc.textContent = data.resource_write_lock_holder ? `Held by ${data.resource_write_lock_holder}` : "Exclusive lock for writers (Free)";
+        }
+
+        // Shared Resource Access State
+        if (DOM.rwAccessStateVal) {
+            if (activeWriters.length > 1) {
+                DOM.rwAccessStateVal.textContent = "WRITE COLLISION";
+                DOM.rwAccessStateVal.style.color = "var(--state-blocked)";
+                if (DOM.rwAccessStateDesc) DOM.rwAccessStateDesc.textContent = "Multiple writers writing simultaneously!";
+            } else if (activeWriters.length === 1 && activeReaders.length > 0) {
+                DOM.rwAccessStateVal.textContent = "TORN READ CONFLICT";
+                DOM.rwAccessStateVal.style.color = "var(--state-blocked)";
+                if (DOM.rwAccessStateDesc) DOM.rwAccessStateDesc.textContent = "Reader reading while writer modifies record!";
+            } else if (activeWriters.length === 1) {
+                DOM.rwAccessStateVal.textContent = "EXCLUSIVE WRITE";
+                DOM.rwAccessStateVal.style.color = "#fbbf24";
+                if (DOM.rwAccessStateDesc) DOM.rwAccessStateDesc.textContent = "Single writer in critical section";
+            } else if (activeReaders.length > 0) {
+                DOM.rwAccessStateVal.textContent = `SHARED READ (${activeReaders.length})`;
+                DOM.rwAccessStateVal.style.color = "var(--state-running)";
+                if (DOM.rwAccessStateDesc) DOM.rwAccessStateDesc.textContent = "Multiple concurrent readers allowed";
+            } else {
+                DOM.rwAccessStateVal.textContent = "IDLE";
+                DOM.rwAccessStateVal.style.color = "var(--text-primary)";
+                if (DOM.rwAccessStateDesc) DOM.rwAccessStateDesc.textContent = "No active reader or writer";
+            }
+        }
+
+        // Invariants
+        const writerMutexPreserved = data.invariant_writer_mutex !== undefined ? data.invariant_writer_mutex : (activeWriters.length <= 1 && (!activeWriters.length || !activeReaders.length));
+        if (DOM.rwInvariantWriterMutex) {
+            if (writerMutexPreserved) {
+                DOM.rwInvariantWriterMutex.className = "invariant-pill invariant-ok font-mono";
+                DOM.rwInvariantWriterMutex.textContent = "Writer Mutex: PRESERVED";
+            } else {
+                DOM.rwInvariantWriterMutex.className = "invariant-pill invariant-violated font-mono";
+                DOM.rwInvariantWriterMutex.textContent = "Writer Mutex: VIOLATED (Conflict)";
+            }
+        }
+
+        const integrityPreserved = data.invariant_integrity !== undefined ? data.invariant_integrity : (record.version === record.checksum);
+        if (DOM.rwInvariantIntegrity) {
+            if (integrityPreserved) {
+                DOM.rwInvariantIntegrity.className = "invariant-pill invariant-ok font-mono";
+                DOM.rwInvariantIntegrity.textContent = "Data Integrity: Checksum Valid";
+            } else {
+                DOM.rwInvariantIntegrity.className = "invariant-pill invariant-violated font-mono";
+                DOM.rwInvariantIntegrity.textContent = "Data Integrity: CORRUPTED (Torn Read)";
+            }
+        }
+
+        if (DOM.rwVerificationBadge) {
+            if (integrityPreserved && writerMutexPreserved) {
+                DOM.rwVerificationBadge.className = "verification-status-badge status-verified-green font-mono";
+                DOM.rwVerificationBadge.textContent = "Verification: PASS (Version == Checksum, Mutex Intact)";
+            } else {
+                DOM.rwVerificationBadge.className = "verification-status-badge status-verified-red font-mono";
+                DOM.rwVerificationBadge.textContent = "Verification: FAIL (Torn Read / Write Collision)";
+            }
+        }
+
+        // Diagnostics Strip
+        if (DOM.rwDirtyReadStat) DOM.rwDirtyReadStat.textContent = data.dirty_read_count || 0;
+        if (DOM.rwTornReadStat) DOM.rwTornReadStat.textContent = data.torn_read_count || 0;
+        if (DOM.rwCollisionStat) DOM.rwCollisionStat.textContent = data.collision_count || 0;
+        if (DOM.rwIntegrityStat) {
+            DOM.rwIntegrityStat.textContent = integrityPreserved ? "100% OK" : "CORRUPT";
+            DOM.rwIntegrityStat.className = integrityPreserved ? "integrity-ok font-mono" : "integrity-corrupt font-mono";
+        }
+
+        // Record Display
         DOM.recordVersionBadge.textContent = `v${record.version || 1}`;
         DOM.recordTitle.textContent = record.title || "OS Concurrency Ledger";
         DOM.recordChecksumBadge.textContent = `Checksum: ${record.checksum !== undefined ? record.checksum : record.version}`;
         DOM.recordContent.textContent = record.content || "";
         DOM.recordLastWriter.textContent = record.last_writer || "System";
 
-        const consistent = record.version === record.checksum && (!activeWriters.length || activeWriters.length === 1);
-        if (consistent) {
+        if (integrityPreserved && writerMutexPreserved) {
             DOM.recordIntegrityStatus.className = "integrity-tag integrity-ok";
             DOM.recordIntegrityStatus.textContent = "State: Consistent";
             DOM.rwRecordCard.classList.remove("glitch-anomaly");
@@ -452,11 +994,11 @@
         }
     }
 
-    // 4. Banker's Algorithm Matrix Lab View
+    // 4. Banker's Algorithm Matrix Lab, Safety Steps, and Rollback View
     function renderBankersAlgorithm(data) {
         if (!DOM.viewBankersAlgorithm) return;
 
-        // 1. Safety State Badge
+        // Safety State Badge
         const isSafe = data.is_currently_safe !== undefined ? data.is_currently_safe : true;
         if (isSafe) {
             DOM.bankerSafetyStateBadge.className = "safety-state-badge badge-safe";
@@ -466,7 +1008,17 @@
             DOM.bankerStateText.textContent = "UNSAFE STATE (DEADLOCK RISK)";
         }
 
-        // 2. Safe Sequence Nodes
+        if (DOM.baVerificationBadge) {
+            if (isSafe) {
+                DOM.baVerificationBadge.className = "verification-status-badge status-verified-green font-mono";
+                DOM.baVerificationBadge.textContent = "Verification: PASS (Safe State Verified)";
+            } else {
+                DOM.baVerificationBadge.className = "verification-status-badge status-verified-red font-mono";
+                DOM.baVerificationBadge.textContent = "Verification: FAIL (Unsafe State Diagnosed)";
+            }
+        }
+
+        // Safe Sequence Nodes
         if (data.safe_sequence && data.safe_sequence.length > 0) {
             const seqStr = data.safe_sequence.map(p => `P${p}`).join(" → ");
             DOM.bankerSafeSeqText.textContent = `< ${seqStr} >`;
@@ -476,14 +1028,17 @@
             DOM.bankerSafeSeqText.style.color = "#ef4444";
         }
 
-        // 3. Available Vector
+        // Available Vector
         if (data.available && data.available.length >= 3) {
             DOM.availValA.textContent = data.available[0];
             DOM.availValB.textContent = data.available[1];
             DOM.availValC.textContent = data.available[2];
+            if (DOM.bankerWorkInitial) {
+                DOM.bankerWorkInitial.textContent = `Init: Work = Available [${data.available.join(', ')}] | Finish = [F, F, F, F, F]`;
+            }
         }
 
-        // 4. Matrix Tables: Allocation, Max, Need
+        // Matrix Tables: Allocation, Max, Need
         function populateMatrixTable(tbodyEl, matrixData) {
             if (!tbodyEl || !matrixData) return;
             tbodyEl.innerHTML = "";
@@ -502,6 +1057,57 @@
         populateMatrixTable(DOM.tbodyAllocation, data.allocation);
         populateMatrixTable(DOM.tbodyMax, data.max_matrix);
         populateMatrixTable(DOM.tbodyNeed, data.need);
+
+        // Step-by-Step Safety Algorithm Visualization
+        if (DOM.bankerStepByStepList) {
+            DOM.bankerStepByStepList.innerHTML = "";
+            if (data.safety_step_details && data.safety_step_details.length > 0) {
+                data.safety_step_details.forEach(step => {
+                    const item = document.createElement("div");
+                    item.className = "safety-step-item step-passed";
+                    const seqStr = step.safe_seq_so_far.map(p => `P${p}`).join(" → ");
+                    item.innerHTML = `
+                        <span class="step-num">Step ${step.step}</span>
+                        <span class="step-proc-badge">Process P${step.process}</span>
+                        <span class="step-calc">Need [${step.need.join(',')}] ≤ Work [${step.work_before.join(',')}]</span>
+                        <span class="step-work-after">Reclaim Alloc [${step.alloc.join(',')}] → New Work [${step.work_after.join(',')}]</span>
+                        <span class="step-seq-cum">&lt; ${seqStr} &gt;</span>
+                    `;
+                    DOM.bankerStepByStepList.appendChild(item);
+                });
+            } else if (data.safety_trace && data.safety_trace.length > 0) {
+                data.safety_trace.forEach((tr, i) => {
+                    const item = document.createElement("div");
+                    item.className = "safety-step-item step-passed";
+                    item.innerHTML = `<span style="grid-column: 1 / -1;">${tr}</span>`;
+                    DOM.bankerStepByStepList.appendChild(item);
+                });
+            }
+        }
+
+        // Unsafe Explanation Box
+        if (DOM.bankerUnsafeExplBox) {
+            if (!isSafe && data.unsafe_explanation) {
+                DOM.bankerUnsafeExplBox.classList.remove("hidden");
+                if (DOM.bankerUnsafeExplText) {
+                    DOM.bankerUnsafeExplText.textContent = data.unsafe_explanation;
+                }
+            } else {
+                DOM.bankerUnsafeExplBox.classList.add("hidden");
+            }
+        }
+
+        // Tentative Allocation & Rollback Status
+        if (DOM.bankerRollbackBadge && data.last_evaluated_request) {
+            const req = data.last_evaluated_request;
+            if (req.was_rolled_back) {
+                DOM.bankerRollbackBadge.className = "invariant-pill invariant-violated font-mono";
+                DOM.bankerRollbackBadge.textContent = `Rollback: P${req.process_id} request reverted (Unsafe state avoided)`;
+            } else {
+                DOM.bankerRollbackBadge.className = "invariant-pill invariant-ok font-mono";
+                DOM.bankerRollbackBadge.textContent = `Rollback: None (P${req.process_id} request safely committed)`;
+            }
+        }
     }
 
     // =========================================================================
@@ -565,7 +1171,12 @@
         entry.dataset.category = category;
 
         let badgeClass = "badge-info";
-        if (type.includes("ACQUIRED") || type.includes("SUCCESS")) badgeClass = "badge-success";
+        if (type.includes("ACQUIRED") || type.includes("SUCCESS") || type.includes("SAFE_GRANT") || type.includes("VERIFIED") || type.includes("STEP_TRIGGERED")) {
+            badgeClass = "badge-solution";
+            if (category === "sync" || category === "all") {
+                category = "solution";
+            }
+        }
         else if (type.includes("ATTEMPT") || type.includes("WAIT")) badgeClass = "badge-acquire";
         else if (type.includes("RELEASE")) badgeClass = "badge-release";
         else if (type.includes("ANOMALY") || type.includes("OVERFLOW") || type.includes("UNDERFLOW")) badgeClass = "badge-anomaly";
@@ -582,7 +1193,8 @@
 
         // Check filter
         if (state.activeFilter !== "all") {
-            if (state.activeFilter === "sync" && category !== "sync") entry.style.display = "none";
+            if (state.activeFilter === "solution" && category !== "solution" && category !== "sync") entry.style.display = "none";
+            else if (state.activeFilter === "sync" && category !== "sync" && category !== "solution") entry.style.display = "none";
             else if (state.activeFilter === "state" && category !== "state") entry.style.display = "none";
             else if (state.activeFilter === "anomaly" && category !== "anomaly") entry.style.display = "none";
         }
@@ -611,7 +1223,9 @@
             const entryCat = entry.dataset.category || "all";
             if (category === "all") {
                 entry.style.display = "grid";
-            } else if (category === "sync" && entryCat === "sync") {
+            } else if (category === "solution" && (entryCat === "solution" || entryCat === "sync")) {
+                entry.style.display = "grid";
+            } else if (category === "sync" && (entryCat === "sync" || entryCat === "solution")) {
                 entry.style.display = "grid";
             } else if (category === "state" && entryCat === "state") {
                 entry.style.display = "grid";
@@ -721,13 +1335,52 @@
         renderThreadsGrid();
         resetAnomalies();
         if (state.scenario === "producer_consumer") {
-            renderBufferSlots(5, []);
             DOM.metricProduced.textContent = "0";
             DOM.metricConsumed.textContent = "0";
+            renderProducerConsumer({
+                capacity: 5,
+                buffer: [],
+                total_produced: 0,
+                total_consumed: 0,
+                sem_empty: 5,
+                sem_full: 0,
+                sem_mutex: 1,
+                last_sync_action: "Bounded buffer reset complete."
+            });
         } else if (state.scenario === "dining_philosophers") {
-            renderDiningTable(state.threadCount, [], [], []);
+            renderDiningPhilosophers({
+                num_philosophers: state.threadCount,
+                philosopher_status: [],
+                fork_owners: [],
+                eat_counts: [0, 0, 0, 0, 0],
+                total_meals: 0,
+                rag: { allocation_edges: [], request_edges: [], cycle_detected: false },
+                coffman: { mutual_exclusion: true, hold_and_wait: false, no_preemption: true, circular_wait: false },
+                acquisition_orders: [
+                    { phil: 0, first_fork: 0, second_fork: 1, rule: "min(0,1) then max(0,1)", is_asymmetric: false },
+                    { phil: 1, first_fork: 1, second_fork: 2, rule: "min(1,2) then max(1,2)", is_asymmetric: false },
+                    { phil: 2, first_fork: 2, second_fork: 3, rule: "min(2,3) then max(2,3)", is_asymmetric: false },
+                    { phil: 3, first_fork: 3, second_fork: 4, rule: "min(3,4) then max(3,4)", is_asymmetric: false },
+                    { phil: 4, first_fork: 0, second_fork: 4, rule: "min(0,4) then max(0,4) (ASYMMETRIC)", is_asymmetric: true }
+                ]
+            });
         } else if (state.scenario === "readers_writers") {
-            renderReadersWriters({ record: { title: "OS Concurrency Ledger", version: 1, checksum: 1, content: "Clean reset state" } });
+            renderReadersWriters({
+                record: { title: "OS Concurrency Ledger", version: 1, checksum: 1, content: "Clean reset state", last_writer: "Genesis" },
+                active_readers: [],
+                active_writers: [],
+                waiting_readers: [],
+                waiting_writers: [],
+                read_count: 0,
+                read_count_mutex_locked: false,
+                resource_write_lock_locked: false,
+                resource_write_lock_holder: null,
+                dirty_read_count: 0,
+                torn_read_count: 0,
+                collision_count: 0,
+                invariant_writer_mutex: true,
+                invariant_integrity: true
+            });
         } else if (state.scenario === "bankers_algorithm") {
             renderBankersAlgorithm({
                 available: [3, 3, 2],
@@ -735,7 +1388,14 @@
                 max_matrix: [[7, 5, 3], [3, 2, 2], [9, 0, 2], [2, 2, 2], [4, 3, 3]],
                 need: [[7, 4, 3], [1, 2, 2], [6, 0, 0], [0, 1, 1], [4, 3, 1]],
                 is_currently_safe: true,
-                safe_sequence: [1, 3, 4, 0, 2]
+                safe_sequence: [1, 3, 4, 0, 2],
+                safety_step_details: [
+                    { step: 1, process: 1, need: [1, 2, 2], work_before: [3, 3, 2], can_finish: true, alloc: [2, 0, 0], work_after: [5, 3, 2], finish_array: [false, true, false, false, false], safe_seq_so_far: [1] },
+                    { step: 2, process: 3, need: [0, 1, 1], work_before: [5, 3, 2], can_finish: true, alloc: [2, 1, 1], work_after: [7, 4, 3], finish_array: [false, true, false, true, false], safe_seq_so_far: [1, 3] },
+                    { step: 3, process: 4, need: [4, 3, 1], work_before: [7, 4, 3], can_finish: true, alloc: [0, 0, 2], work_after: [7, 4, 5], finish_array: [false, true, false, true, true], safe_seq_so_far: [1, 3, 4] },
+                    { step: 4, process: 0, need: [7, 4, 3], work_before: [7, 4, 5], can_finish: true, alloc: [0, 1, 0], work_after: [7, 5, 5], finish_array: [true, true, false, true, true], safe_seq_so_far: [1, 3, 4, 0] },
+                    { step: 5, process: 2, need: [6, 0, 0], work_before: [7, 5, 5], can_finish: true, alloc: [3, 0, 2], work_after: [10, 5, 7], finish_array: [true, true, true, true, true], safe_seq_so_far: [1, 3, 4, 0, 2] }
+                ]
             });
             if (DOM.bankerTestResultBox) DOM.bankerTestResultBox.classList.add("hidden");
         }
@@ -794,7 +1454,7 @@
         }
         DOM.metricProduced.textContent = data.total_produced || 0;
         DOM.metricConsumed.textContent = data.total_consumed || 0;
-        renderBufferSlots(data.capacity || 5, data.buffer || []);
+        renderProducerConsumer(data);
     });
 
     socket.on("table_update", data => {
@@ -805,12 +1465,7 @@
         if (data.is_deadlocked) {
             setSimulationRunning(true, false, true);
         }
-        renderDiningTable(
-            data.num_philosophers || state.threadCount,
-            data.philosopher_status || [],
-            data.fork_owners || [],
-            data.eat_counts || []
-        );
+        renderDiningPhilosophers(data);
     });
 
     socket.on("record_update", data => {
@@ -994,6 +1649,52 @@
                 process_id: pid,
                 request: [reqA, reqB, reqC]
             });
+        });
+    }
+
+    // Banker's Algorithm Preset Demos (Problem Mode vs Safe Mode)
+    if (DOM.btnDemoSafeReq) {
+        DOM.btnDemoSafeReq.addEventListener("click", () => {
+            if (DOM.reqProcSelect) DOM.reqProcSelect.value = "1";
+            if (DOM.reqValA) DOM.reqValA.value = "1";
+            if (DOM.reqValB) DOM.reqValB.value = "0";
+            if (DOM.reqValC) DOM.reqValC.value = "2";
+            if (DOM.btnTestBankerReq) DOM.btnTestBankerReq.click();
+        });
+    }
+
+    if (DOM.btnDemoUnsafeReq) {
+        DOM.btnDemoUnsafeReq.addEventListener("click", () => {
+            if (DOM.reqProcSelect) DOM.reqProcSelect.value = "0";
+            if (DOM.reqValA) DOM.reqValA.value = "0";
+            if (DOM.reqValB) DOM.reqValB.value = "2";
+            if (DOM.reqValC) DOM.reqValC.value = "0";
+            if (DOM.btnTestBankerReq) DOM.btnTestBankerReq.click();
+        });
+    }
+
+    if (DOM.btnDemoExceedReq) {
+        DOM.btnDemoExceedReq.addEventListener("click", () => {
+            if (DOM.reqProcSelect) DOM.reqProcSelect.value = "1";
+            if (DOM.reqValA) DOM.reqValA.value = "5";
+            if (DOM.reqValB) DOM.reqValB.value = "5";
+            if (DOM.reqValC) DOM.reqValC.value = "5";
+            if (DOM.btnTestBankerReq) DOM.btnTestBankerReq.click();
+        });
+    }
+
+    // Problem Mode / Solution Mode Segmented Control
+    if (DOM.btnModeProblem) {
+        DOM.btnModeProblem.addEventListener("click", () => {
+            if (state.isRunning) return;
+            setSyncMode(false);
+        });
+    }
+
+    if (DOM.btnModeSolution) {
+        DOM.btnModeSolution.addEventListener("click", () => {
+            if (state.isRunning) return;
+            setSyncMode(true);
         });
     }
 

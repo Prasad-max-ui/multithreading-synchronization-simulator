@@ -22,3 +22,8 @@ env/
 # OS files
 .DS_Store
 Thumbs.db
+
+# member file
+PRESENTATION_SLIDES.md
+PRESENTATION_SLIDES.md
+MULTITHREADING-and-SYNCHRONIZATION-SIMULATOR.pptx

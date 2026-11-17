@@ -67,10 +67,19 @@ class BankersAlgorithmScenario(BaseScenario):
         self.safe_sequence: List[int] = []
         self.is_currently_safe = True
         self.safety_steps: List[str] = []
+        self.safety_step_details: List[Dict[str, Any]] = []
+        self.unsafe_explanation: str = ""
+        self.theory_insight: str = (
+            "OS Theory Insight: Unsafe State != Deadlock. An unsafe state means the OS cannot "
+            "GUARANTEE deadlock avoidance if every process simultaneously demands its declared "
+            "maximum claim. Deadlock only occurs if processes exercise their full demands while "
+            "available resources are depleted. If processes release early or request gradually, "
+            "execution may complete without ever deadlocking."
+        )
         self.last_evaluated_request: Optional[Dict[str, Any]] = None
 
         # Run initial safety check
-        self.is_currently_safe, self.safe_sequence, self.safety_steps = self.check_safety(
+        self.is_currently_safe, self.safe_sequence, self.safety_steps, self.safety_step_details, self.unsafe_explanation = self.check_safety(
             self.available, self.allocation, self.need
         )
 
@@ -96,7 +105,7 @@ class BankersAlgorithmScenario(BaseScenario):
         avail: List[int],
         alloc: List[List[int]],
         need_mat: List[List[int]]
-    ) -> Tuple[bool, List[int], List[str]]:
+    ) -> Tuple[bool, List[int], List[str], List[Dict[str, Any]], str]:
         """
         Dijkstra's Safety Algorithm:
         1. Work = Available, Finish[i] = False
@@ -109,8 +118,10 @@ class BankersAlgorithmScenario(BaseScenario):
         work = list(avail)
         finish = [False] * n
         sequence = []
-        trace_steps = [f"Initial Work Vector: {work}"]
+        trace_steps = [f"Initial Work Vector = Available: {work}"]
+        step_details = []
 
+        step_counter = 0
         while len(sequence) < n:
             found = False
             for i in range(n):
@@ -118,30 +129,50 @@ class BankersAlgorithmScenario(BaseScenario):
                     # Check if Need[i] <= Work
                     can_allocate = all(need_mat[i][j] <= work[j] for j in range(m))
                     if can_allocate:
+                        work_before = list(work)
                         for j in range(m):
                             work[j] += alloc[i][j]
                         finish[i] = True
                         sequence.append(i)
                         found = True
+                        step_counter += 1
+
+                        step_info = {
+                            "step": step_counter,
+                            "process": f"P{i}",
+                            "process_id": i,
+                            "work_before": work_before,
+                            "need": list(need_mat[i]),
+                            "allocation_reclaimed": list(alloc[i]),
+                            "work_after": list(work),
+                            "finish": list(finish),
+                            "current_sequence": [f"P{p}" for p in sequence]
+                        }
+                        step_details.append(step_info)
+
                         trace_steps.append(
-                            f"Step {len(sequence)}: P{i} satisfied (Need {need_mat[i]} <= Work). "
-                            f"Process completes & releases resources -> New Work = {list(work)}"
+                            f"Step {step_counter}: P{i} satisfied (Need {need_mat[i]} <= Work {work_before}). "
+                            f"Reclaimed Allocation {alloc[i]} -> New Work = {list(work)}"
                         )
                         break
             if not found:
                 break
 
         is_safe = (len(sequence) == n)
+        unsafe_explanation = ""
         if is_safe:
             seq_str = " -> ".join([f"P{p}" for p in sequence])
-            trace_steps.append(f"Result: SAFE STATE verified. Valid execution sequence: < {seq_str} >")
+            trace_steps.append(f"Result: SAFE STATE verified. Safe execution sequence: < {seq_str} >")
         else:
             unfinished = [f"P{i}" for i in range(n) if not finish[i]]
-            trace_steps.append(
-                f"Result: UNSAFE STATE! Deadlock condition! Processes {unfinished} cannot be satisfied."
+            unfinished_needs = {f"P{i}": need_mat[i] for i in range(n) if not finish[i]}
+            unsafe_explanation = (
+                f"Available resources {work} are strictly insufficient to satisfy remaining processes {unfinished} "
+                f"with Needs {unfinished_needs}. No remaining process can be guaranteed to finish."
             )
+            trace_steps.append(f"Result: UNSAFE STATE! {unsafe_explanation}")
 
-        return is_safe, sequence, trace_steps
+        return is_safe, sequence, trace_steps, step_details, unsafe_explanation
 
     def request_resources(self, process_id: int, request_vector: List[int]) -> Dict[str, Any]:
         """
@@ -205,7 +236,7 @@ class BankersAlgorithmScenario(BaseScenario):
                 new_need[process_id][j] -= request_vector[j]
 
             # Run Safety Algorithm on tentative state
-            is_safe, safe_seq, trace = self.check_safety(new_avail, new_alloc, new_need)
+            is_safe, safe_seq, trace, step_details, unsafe_exp = self.check_safety(new_avail, new_alloc, new_need)
 
             if self.sync_mode:
                 # BANKER'S AVOIDANCE ON:
@@ -216,6 +247,8 @@ class BankersAlgorithmScenario(BaseScenario):
                     self.need = new_need
                     self.safe_sequence = safe_seq
                     self.safety_steps = trace
+                    self.safety_step_details = step_details
+                    self.unsafe_explanation = ""
                     self.is_currently_safe = True
 
                     res = {
@@ -224,6 +257,8 @@ class BankersAlgorithmScenario(BaseScenario):
                         "request": request_vector,
                         "safe_sequence": safe_seq,
                         "trace": trace,
+                        "step_details": step_details,
+                        "rollback_performed": False,
                         "message": f"Request {request_vector} by P{process_id} is SAFE. Resources allocated!"
                     }
                     self.set_thread_state(
@@ -239,22 +274,29 @@ class BankersAlgorithmScenario(BaseScenario):
                         "process": f"P{process_id}",
                         "request": request_vector,
                         "trace": trace,
-                        "message": f"Request {request_vector} by P{process_id} rejected! Would cause UNSAFE STATE (Deadlock Risk)."
+                        "step_details": step_details,
+                        "unsafe_explanation": unsafe_exp,
+                        "rollback_performed": True,
+                        "tentative_available": new_avail,
+                        "restored_available": list(self.available),
+                        "message": f"Request {request_vector} by P{process_id} rejected and ROLLED BACK! Would cause UNSAFE STATE (Deadlock Risk)."
                     }
                     self.set_thread_state(
                         f"Process-P{process_id}",
                         "WAITING",
-                        f"Request rejected by Banker's Algorithm (Unsafe State)",
+                        f"Request rejected by Banker's Algorithm (Unsafe State - Rolled back)",
                         role="Process"
                     )
             else:
-                # NAIVE ALLOCATION (NO DEADLOCK AVOIDANCE):
+                # NAIVE ALLOCATION (NO DEADLOCK AVOIDANCE - PROBLEM MODE):
                 # Grant blindly even if unsafe!
                 self.available = new_avail
                 self.allocation = new_alloc
                 self.need = new_need
                 self.safe_sequence = safe_seq
                 self.safety_steps = trace
+                self.safety_step_details = step_details
+                self.unsafe_explanation = unsafe_exp
                 self.is_currently_safe = is_safe
 
                 if not is_safe:
@@ -264,7 +306,10 @@ class BankersAlgorithmScenario(BaseScenario):
                         "process": f"P{process_id}",
                         "request": request_vector,
                         "trace": trace,
-                        "message": f"NAIVE GRANT: Allocated {request_vector} to P{process_id} WITHOUT safety check -> System entered UNSAFE STATE!"
+                        "step_details": step_details,
+                        "unsafe_explanation": unsafe_exp,
+                        "rollback_performed": False,
+                        "message": f"PROBLEM MODE: Allocated {request_vector} to P{process_id} WITHOUT safety check -> System entered UNSAFE STATE!"
                     }
                     self.record_anomaly(
                         "UNSAFE_STATE_DEADLOCK",
@@ -281,6 +326,8 @@ class BankersAlgorithmScenario(BaseScenario):
                         "process": f"P{process_id}",
                         "request": request_vector,
                         "trace": trace,
+                        "step_details": step_details,
+                        "rollback_performed": False,
                         "message": f"Naive grant: {request_vector} to P{process_id}."
                     }
 
@@ -339,7 +386,7 @@ class BankersAlgorithmScenario(BaseScenario):
                             f"Task completed! Released all allocated resources back to pool.",
                             role="Process"
                         )
-                        self.is_currently_safe, self.safe_sequence, self.safety_steps = self.check_safety(
+                        self.is_currently_safe, self.safe_sequence, self.safety_steps, self.safety_step_details, self.unsafe_explanation = self.check_safety(
                             self.available, self.allocation, self.need
                         )
                         self.emit_state_update()
@@ -366,6 +413,9 @@ class BankersAlgorithmScenario(BaseScenario):
                 "is_currently_safe": self.is_currently_safe,
                 "safe_sequence": list(self.safe_sequence),
                 "safety_steps": list(self.safety_steps),
+                "safety_step_details": list(self.safety_step_details),
+                "unsafe_explanation": self.unsafe_explanation,
+                "theory_insight": self.theory_insight,
                 "last_evaluated_request": self.last_evaluated_request,
                 "anomaly_count": self.anomaly_count,
                 "is_deadlocked": self.is_deadlocked,

@@ -132,6 +132,14 @@ class InstrumentedLock(InstrumentedSyncBase):
     def locked(self) -> bool:
         return self._lock.locked()
 
+    @property
+    def is_locked(self) -> bool:
+        return self._lock.locked()
+
+    @property
+    def holder(self) -> Optional[str]:
+        return self._owner_name
+
     def __enter__(self):
         self.acquire()
         return self

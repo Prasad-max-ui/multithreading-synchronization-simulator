@@ -47,6 +47,13 @@ class ReadersWritersScenario(BaseScenario):
         # Active reading/writing trackers
         self.active_readers: Set[str] = set()
         self.active_writers: Set[str] = set()
+        self.waiting_readers: Set[str] = set()
+        self.waiting_writers: Set[str] = set()
+
+        # Detailed anomaly tracking
+        self.dirty_read_count = 0
+        self.torn_read_count = 0
+        self.collision_count = 0
 
         # Synchronization primitives
         self.read_count_mutex = InstrumentedLock("read_count_mutex", emitter=self.emit_sync_event)
@@ -94,24 +101,33 @@ class ReadersWritersScenario(BaseScenario):
 
             if self.sync_mode:
                 # SYNCHRONIZED READER
-                self.set_thread_state(thread_name, "WAITING", "Requesting read permission...", role="Reader")
+                with self.state_lock:
+                    self.waiting_readers.add(thread_name)
+                self.set_thread_state(thread_name, "WAITING", "Requesting read permission (read_count_mutex)...", role="Reader")
+                self.emit_state_update()
 
                 # Acquire mutex to increment read_count
                 if not self.read_count_mutex.acquire_interruptible(self.stop_event, poll_interval=0.1):
+                    with self.state_lock:
+                        self.waiting_readers.discard(thread_name)
                     break
 
                 self.read_count += 1
                 if self.read_count == 1:
-                    # First reader blocks writers
+                    # First reader blocks writers on resource_write_lock
+                    self.set_thread_state(thread_name, "WAITING", "First reader locking out writers (resource_write_lock)...", role="Reader")
                     got_write_lock = self.resource_write_lock.acquire_interruptible(self.stop_event, poll_interval=0.1)
                     if not got_write_lock:
                         self.read_count -= 1
                         self.read_count_mutex.release()
+                        with self.state_lock:
+                            self.waiting_readers.discard(thread_name)
                         break
                 self.read_count_mutex.release()
 
                 # Perform read inside critical section
                 with self.state_lock:
+                    self.waiting_readers.discard(thread_name)
                     self.active_readers.add(thread_name)
                 v = self.record["version"]
                 c = self.record["checksum"]
@@ -151,13 +167,13 @@ class ReadersWritersScenario(BaseScenario):
 
                 v = self.record["version"]
                 c = self.record["checksum"]
-                title = self.record["title"]
 
                 # Detect race condition: Dirty read while writer is writing
                 with self.state_lock:
                     current_writers = list(self.active_writers)
 
                 if current_writers:
+                    self.dirty_read_count += 1
                     self.record_anomaly(
                         "DIRTY_READ",
                         f"Dirty Read! {thread_name} read record while writer(s) {current_writers} were modifying it!",
@@ -166,6 +182,7 @@ class ReadersWritersScenario(BaseScenario):
 
                 # Detect race condition: Torn read where version != checksum
                 if v != c:
+                    self.torn_read_count += 1
                     self.record_anomaly(
                         "TORN_READ_INCONSISTENCY",
                         f"Torn Read! {thread_name} observed fractured state: version={v} != checksum={c}",
@@ -193,8 +210,14 @@ class ReadersWritersScenario(BaseScenario):
 
             if self.sync_mode:
                 # SYNCHRONIZED WRITER
-                self.set_thread_state(thread_name, "WAITING", "Waiting for exclusive write lock...", role="Writer")
+                with self.state_lock:
+                    self.waiting_writers.add(thread_name)
+                self.set_thread_state(thread_name, "WAITING", "Waiting for exclusive write lock (resource_write_lock)...", role="Writer")
+                self.emit_state_update()
+
                 got_lock = self.resource_write_lock.acquire_interruptible(self.stop_event, poll_interval=0.1)
+                with self.state_lock:
+                    self.waiting_writers.discard(thread_name)
                 if not got_lock or self.stop_event.is_set():
                     break
 
@@ -210,7 +233,7 @@ class ReadersWritersScenario(BaseScenario):
                 self.record["last_writer"] = thread_name
                 self.record["updated_at"] = time.time()
 
-                self.set_thread_state(thread_name, "RUNNING", f"Writing update v{new_version} (Exclusive)", role="Writer")
+                self.set_thread_state(thread_name, "RUNNING", f"Writing update v{new_version} (Exclusive Access)", role="Writer")
                 self.emit_state_update()
                 self.sleep_interruptible(0.6)
 
@@ -231,6 +254,7 @@ class ReadersWritersScenario(BaseScenario):
 
                 # Anomaly: Concurrent writers!
                 if writers_count > 1:
+                    self.collision_count += 1
                     self.record_anomaly(
                         "CONCURRENT_WRITERS",
                         f"Mutual exclusion violated! {writers_count} writers active simultaneously: {list(self.active_writers)}",
@@ -261,14 +285,32 @@ class ReadersWritersScenario(BaseScenario):
     def emit_state_update(self):
         """Broadcast shared record state to frontend."""
         with self.state_lock:
+            active_r = len(self.active_readers)
+            active_w = len(self.active_writers)
+            writer_mutex_ok = (active_w <= 1 and (active_w == 0 or active_r == 0))
+            integrity_ok = (self.record["version"] == self.record["checksum"])
+
             data = {
                 "scenario": self.name,
                 "sync_mode": self.sync_mode,
                 "record": dict(self.record),
                 "active_readers": list(self.active_readers),
                 "active_writers": list(self.active_writers),
-                "active_reader_count": len(self.active_readers),
-                "active_writer_count": len(self.active_writers),
+                "active_reader_count": active_r,
+                "active_writer_count": active_w,
+                "waiting_readers": list(self.waiting_readers),
+                "waiting_writers": list(self.waiting_writers),
+                "waiting_reader_count": len(self.waiting_readers),
+                "waiting_writer_count": len(self.waiting_writers),
+                "read_count": self.read_count,
+                "read_count_mutex_locked": self.read_count_mutex.is_locked,
+                "resource_write_lock_locked": self.resource_write_lock.is_locked,
+                "resource_write_lock_holder": getattr(self.resource_write_lock, "holder", None),
+                "dirty_read_count": self.dirty_read_count,
+                "torn_read_count": self.torn_read_count,
+                "collision_count": self.collision_count,
+                "invariant_writer_mutex": writer_mutex_ok,
+                "invariant_integrity": integrity_ok,
                 "anomaly_count": self.anomaly_count,
                 "threads": dict(self.threads)
             }

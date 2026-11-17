@@ -178,14 +178,20 @@ def handle_speed(data):
 
 @socketio.on("banker_custom_request")
 def handle_banker_request(data):
+    global current_simulation
     process_id = int(data.get("process_id", 0))
     request_vector = [int(x) for x in data.get("request", [0, 0, 0])]
     with sim_lock:
-        if current_simulation and isinstance(current_simulation, BankersAlgorithmScenario):
-            result = current_simulation.request_resources(process_id, request_vector)
-            emit("banker_request_result", result)
-        else:
-            emit("simulation_error", {"message": "Banker's Algorithm scenario is not currently active"})
+        if not (current_simulation and isinstance(current_simulation, BankersAlgorithmScenario)):
+            current_simulation = BankersAlgorithmScenario(
+                sync_mode=True,
+                thread_count=5,
+                speed=1.0,
+                emitter=broadcast_event
+            )
+        result = current_simulation.request_resources(process_id, request_vector)
+        emit("banker_request_result", result)
+        current_simulation.emit_state_update()
 
 
 if __name__ == "__main__":
